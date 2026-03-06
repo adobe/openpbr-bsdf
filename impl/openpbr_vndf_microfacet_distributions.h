@@ -1,0 +1,144 @@
+/***************************************************************************
+ * Copyright 2026 Adobe
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************/
+
+#ifndef OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H
+#define OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H
+
+#include "../openpbr_basis.h"
+#include "openpbr_lobe_utils.h"
+
+// The classes here abstract away all of the data, function calls, and coordinate-system transformations
+// necessary to sample and evaluate microfacet distributions with GGX+Smith visible-normal sampling.
+// The client microfacet lobes need not know whether the distribution is isotropic or anisotropic.
+// These classes have no virtual functions; duck typing can be used to avoid any abstraction cost.
+
+///////////////////////////////////////////////////
+// AnisotropicGGXSmithVNDFMicrofacetDistribution //
+///////////////////////////////////////////////////
+
+struct OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution
+{
+    vec2 alpha;
+    OpenPBR_Basis basis_ff;
+
+    // Can be used by the client lobes to get the original or standard isotropic alpha value,
+    // which is needed for auxillary operations like creating microfacet-multiple-scattering lobes
+    // and estimating lobe contributions.
+    float isotropic_alpha;
+};
+
+vec3 openpbr_sample_ggx_smith_vndf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                                   const vec3 view_direction,
+                                   const vec3 normal_ff,
+                                   const vec2 rand)
+{
+    // Choose microfacet normal (in local space).
+    const vec3 half_vector_local =
+        openpbr_sample_aniso_ggx_smith_vndf(microfacet_distr.alpha, openpbr_world_to_local(microfacet_distr.basis_ff, view_direction), rand);
+    ASSERT(half_vector_local.z >= 0.0f, "Bad half vector");
+
+    // Map half vector to world.
+    return openpbr_local_to_world(microfacet_distr.basis_ff, half_vector_local);
+}
+
+float openpbr_eval_ggx(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                       const vec3 half_vector,
+                       const vec3 normal_ff)
+{
+    return openpbr_eval_aniso_ggx(openpbr_world_to_local(microfacet_distr.basis_ff, half_vector), microfacet_distr.alpha);
+}
+
+float openpbr_eval_smith_g1(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                            const vec3 view_direction_or_light_direction,
+                            float iodotn)
+{
+    return openpbr_eval_aniso_smith_g1(openpbr_world_to_local(microfacet_distr.basis_ff, view_direction_or_light_direction), microfacet_distr.alpha);
+}
+
+float openpbr_eval_smith_g2(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                            const vec3 view_direction,
+                            const vec3 light_direction,
+                            float idotn,
+                            float odotn)
+{
+    return openpbr_eval_aniso_smith_g2(openpbr_world_to_local(microfacet_distr.basis_ff, view_direction),
+                                       openpbr_world_to_local(microfacet_distr.basis_ff, light_direction),
+                                       microfacet_distr.alpha);
+}
+
+float openpbr_get_isotropic_alpha(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr)
+{
+    return microfacet_distr.isotropic_alpha;
+}
+
+/////////////////////////////////////////////////
+// IsotropicGGXSmithVNDFMicrofacetDistribution //
+/////////////////////////////////////////////////
+
+struct OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution
+{
+    float alpha;
+};
+
+vec3 openpbr_sample_ggx_smith_vndf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                                   const vec3 view_direction,
+                                   const vec3 normal_ff,
+                                   const vec2 rand)
+{
+    // Construct a temporary frame.
+    const OpenPBR_Basis basis_ff = openpbr_make_basis(normal_ff);
+
+    // Choose microfacet normal (in local space).
+    const vec3 half_vector_local =
+        openpbr_sample_aniso_ggx_smith_vndf(vec2(microfacet_distr.alpha), openpbr_world_to_local(basis_ff, view_direction), rand);
+    ASSERT(half_vector_local.z >= 0.0f, "Bad half vector");
+
+    // Map half vector to world.
+    return openpbr_local_to_world(basis_ff, half_vector_local);
+}
+
+float openpbr_eval_ggx(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                       const vec3 half_vector,
+                       const vec3 normal_ff)
+{
+    return openpbr_eval_aniso_ggx(openpbr_world_to_local(openpbr_make_basis(normal_ff), half_vector), vec2(microfacet_distr.alpha));
+    // This code works too, but it is less numerically stable at low roughnesses:
+    //     const float hdotn = dot(half_vector, normal_ff);
+    //     return openpbr_eval_iso_ggx(abs(hdotn), microfacet_distr.alpha);
+}
+
+float openpbr_eval_smith_g1(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                            const vec3 view_direction_or_light_direction,
+                            float iodotn)
+{
+    return openpbr_eval_iso_smith_g1(abs(iodotn), microfacet_distr.alpha);
+}
+
+float openpbr_eval_smith_g2(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
+                            const vec3 view_direction,
+                            const vec3 light_direction,
+                            float idotn,
+                            float odotn)
+{
+    return openpbr_eval_iso_smith_g2(abs(idotn), abs(odotn), microfacet_distr.alpha);
+}
+
+float openpbr_get_isotropic_alpha(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr)
+{
+    return microfacet_distr.alpha;
+}
+
+#endif  // !OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H

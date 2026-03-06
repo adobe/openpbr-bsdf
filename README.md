@@ -1,0 +1,293 @@
+# Adobe's OpenPBR BSDF
+
+A self-contained, portable implementation of the [OpenPBR 1.0](https://academysoftwarefoundation.github.io/OpenPBR/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
+
+---
+
+## Overview
+
+OpenPBR is an "uber-shader" specification that merges [Adobe Standard Material](https://helpx.adobe.com/substance-3d-general/adobe-standard-material.html) and [Autodesk Standard Surface](https://autodesk.github.io/standard-surface/) into a single, physically plausible framework. We implement it as a fixed set of nested lobe classes (e.g., fuzz, coat), all sharing the same interface:
+
+- **Evaluate** the BSDF
+- **Sample** the BSDF
+- **Compute** the PDF
+
+In addition to those three core functions, the prepared BSDF exposes a single unified volume that consolidates all volumetric contributions from the full OpenPBR parameter set into one set of low-level properties. Volume integration itself is left entirely to the host renderer.
+
+---
+
+## Why Open Source?
+
+OpenPBR is a powerful but complex material model — implementing it well from scratch requires deep rendering knowledge and a lot of time. We're open-sourcing this to lower that barrier: even a simple path tracer can integrate this production-grade implementation of the full OpenPBR 1.0 parameter set. This is the same code that ships in Eclair today, not a prototype or sample, and we hope it helps teams across the ecosystem adopt OpenPBR faster and validate their own integrations against a real-world reference. The code is released under Apache 2.0.
+
+Note: This is shared as a reference implementation, not run as a community-driven open-source project. Because this code lives in a shipping product, we can't commit to a formal external review process. Pull requests, bug reports, and feature requests are all welcome, and we'll address them on a best-effort basis as our priorities allow. We can't promise to address every item, and large or invasive changes are unlikely to be accepted.
+
+---
+
+## Key Features
+
+- **Single-include API:** `#include "openpbr.h"` brings in the complete public API — all types, settings, and the full BSDF.
+- **Multi-language support:** C++, GLSL, CUDA, MSL, or Slang from the same source via a thin interop layer.
+- **Self-contained:** No globals, no hidden dependencies – everything lives alongside the BSDF.
+- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, energy table storage type, fast math, and custom interop.
+- **Fixed-lobe architecture:** One class per material component.
+- **Energy-conserving:** The BSDF is designed to be energy-conserving for most common configurations, using precomputed LUTs for multiple-scattering compensation.
+- **Reciprocal:** The BSDF satisfies Helmholtz reciprocity for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the exception with transmission. (Note that reciprocity may be traded for better energy conservation in future versions.)
+
+---
+
+## High-Level Architecture
+
+```text
+openpbr/
+├── openpbr.h                     ← Single include for the entire public API
+├── openpbr_settings.h            ← Compile-time feature flags and configuration
+├── interop/                      ← Cross-language macro layer (auto-detected per backend)
+│   ├── openpbr_interop.h         ← Router: selects the correct backend header
+│   └── ...                       ← Per-backend headers (C++, GLSL, CUDA, MSL, Slang)
+├── openpbr_resolved_inputs.h     ← Material parameter struct and default initialization
+├── openpbr_constants.h           ← Material constants
+├── openpbr_basis.h               ← Coordinate frame utilities
+├── openpbr_diffuse_specular.h    ← Diffuse/specular component type
+├── openpbr_bsdf_lobe_type.h      ← BSDF lobe type flags
+├── openpbr_volume_homogeneous.h  ← Volume type (OpenPBR_HomogeneousVolume) exposed in OpenPBR_PreparedBsdf
+├── openpbr_api.h                 ← Public BSDF functions (prepare, sample, eval, pdf)
+└── impl/                         ← All implementation details (lobes, utilities, data)
+    ├── openpbr_bsdf.h                     ← Main BSDF implementation
+    ├── openpbr_fuzz_lobe.h                ← Outermost lobe (fuzz/sheen)
+    ├── openpbr_coating_lobe.h             ← Coating lobe
+    ├── openpbr_aggregate_lobe.h           ← Base layer aggregate
+    ├── ...                                ← Other lobe implementations and utilities
+    └── data/                              ← Lookup table data arrays
+        ├── openpbr_data_constants.h       ← LUT dimensions and types
+        ├── openpbr_energy_arrays.h        ← Energy compensation table declarations (7 tables)
+        ├── openpbr_energy_array_access.h  ← Energy table sampling utilities
+        ├── openpbr_ltc_array.h            ← LTC table declaration for fuzz lobe
+        └── ...                            ← LUT data files (*_data.h)
+```
+
+1. **Resolved Inputs**
+   - `OpenPBR_ResolvedInputs` – A struct containing all official OpenPBR parameters after texture evaluation (`base_color`, `specular_roughness`, etc.), plus a few extra properties specific to this implementation.
+   - `openpbr_make_default_resolved_inputs()` – Creates an `OpenPBR_ResolvedInputs` with default parameter values from the OpenPBR specification.
+
+2. **Initialization**
+
+   Main entry point (initializes both volume and BSDF lobes):
+   - `openpbr_prepare_bsdf_and_volume()` → Returns `OpenPBR_PreparedBsdf` containing the volume and all BSDF lobes ready for evaluation.
+
+   Specialized entry points (split alternative to `openpbr_prepare_bsdf_and_volume()` for lazy evaluation):
+   - `openpbr_prepare_volume()` → Must be called first. Derives volume properties and transmission tint; populates `OpenPBR_VolumeDerivedProps` and the volume in `OpenPBR_PreparedBsdf`.
+   - `openpbr_prepare_lobes()` → Must be called after `openpbr_prepare_volume()`. Sets up BSDF lobes using the derived volume properties; populates the lobes in `OpenPBR_PreparedBsdf`. Can be skipped if only the volume is needed (e.g., for shadow rays).
+
+3. **Shading API**
+   - `openpbr_eval()` → Returns BSDF value (includes cosine term).
+   - `openpbr_sample()` → Importance-samples a light direction; returns weight, PDF, and sampled lobe type.
+   - `openpbr_pdf()` → Returns sampling PDF for a given light direction.
+
+4. **Lobe Interface Pattern**
+
+   GLSL has no class system, so each lobe is implemented as a plain struct paired with free functions that take the struct as their first argument. Every lobe exposes the same three function signatures:
+
+   ```glsl
+   openpbr_eval(lobe, light_direction)
+   openpbr_sample(lobe, rand, light_direction, weight, pdf, sampled_type)
+   openpbr_pdf(lobe, light_direction)
+   ```
+
+   The correct implementation is selected by the struct type via function overloading — compile-time polymorphism with no virtual dispatch overhead. The outermost lobe composes inward, calling the same interface on each inner lobe, so adding or replacing a lobe means implementing the same three functions for its struct type.
+
+---
+
+## Lookup Tables: Dual-Mode Architecture
+
+The BSDF uses precomputed lookup tables (LUTs) for physically accurate energy compensation and fuzz/sheen lobe evaluation:
+
+- Energy compensation tables: 7 tables for microfacet multiple scattering (ideal/opaque dielectrics, ideal metals)
+- LTC table: Linearly Transformed Cosines for the fuzz/sheen lobe
+
+These tables support two modes via the `OPENPBR_USE_TEXTURE_LUTS` compile-time switch:
+
+### Array Mode (`OPENPBR_USE_TEXTURE_LUTS = 0`)
+- Tables embedded as constant arrays in shader code
+- No texture bindings needed
+- Software linear/bilinear/trilinear interpolation
+- Larger shader binary size
+- Slower on GPU
+
+### Texture Mode (`OPENPBR_USE_TEXTURE_LUTS = 1`)
+- Tables stored as 1D/2D/3D textures
+- Requires texture binding infrastructure
+- Hardware-accelerated filtering and interpolation
+- Smaller shader binary size
+- Faster on GPU
+
+**Array Mode is the default** because it eliminates external dependencies on texture assets and binding infrastructure.
+
+Source data format:
+- All LUT data is stored in separate header files in the `data/` directory
+- Data is formatted as flattened C arrays matching the original multi-dimensional layout (e.g., `array[x][y][z]` with rightmost index contiguous)
+- Users can read these files directly to populate GPU textures if needed
+
+Implementation details:
+- Energy tables: 32×32 or 32×32×32 normalized integer values [0, 65535] → [0.0, 1.0]
+  - Storage type configurable via `OPENPBR_ENERGY_TABLES_USE_UINT16` (defaults to `uint` for GLSL compatibility)
+- LTC table: 32×32 vec3 values
+- Both modes use identical indexing and coordinate mappings for exact equivalence
+
+---
+
+## Getting Started
+
+1. Clone this repository.
+2. Include `openpbr.h` in your renderer (this provides the complete public API).
+3. Select a shading language backend. Three backends are auto-detected from built-in compiler macros:
+   - CUDA (`__CUDACC__`), MSL (`__METAL_VERSION__`), and C++ (`__cplusplus`) are detected automatically.
+   - GLSL is the default fallback when none of the above macros are defined – no explicit setting needed.
+   - Slang has no standard built-in detection macro, so it **requires** `OPENPBR_LANGUAGE_TARGET_SLANG=1` to be defined before including `openpbr.h`. Without it, the GLSL backend will be selected, which will likely fail to compile under the Slang compiler.
+
+   Any backend can also be forced explicitly by setting the corresponding `OPENPBR_LANGUAGE_TARGET_CPP`, `_GLSL`, `_MSL`, `_CUDA`, or `_SLANG` flag, which overrides auto-detection.
+
+   **C++ users** must also pre-include GLM (`<glm/glm.hpp>`) before `openpbr.h`; the interop header will emit a clear error if it is missing. See `minimal_cpp_example.cpp` for a complete working example.
+4. Choose lookup table mode: Set `OPENPBR_USE_TEXTURE_LUTS` to 0 for self-contained array mode (default) or 1 for texture mode. In texture mode, `GET_2D_TEXTURE(handle)`, `GET_3D_TEXTURE(handle)`, and `GET_BINDING(name)` macros must be defined before `openpbr.h`; the headers will emit clear errors if they are missing.
+5. Optional – Configure energy table storage: Set `OPENPBR_ENERGY_TABLES_USE_UINT16` to 1 for memory-efficient 16-bit storage if your shading language supports it (MSL, C++, CUDA, Slang). Defaults to 0 (`uint`) for GLSL compatibility, which does not support 16-bit integers in the core specification.
+6. Optional – Fast math: Set `OPENPBR_USE_FAST_MATH_APPROXIMATIONS` to 1 to replace standard math with renderer-supplied fast approximations. You must define `openpbr_fast_rcp_sqrt`, `openpbr_fast_sqrt` (float and vec3), and `openpbr_fast_normalize` before including `openpbr.h`.
+7. Populate `OpenPBR_ResolvedInputs` with texture-evaluated parameters and geometry data, or start with `openpbr_make_default_resolved_inputs()` and override specific properties.
+8. Initialize the BSDF by calling `openpbr_prepare_bsdf_and_volume()`, which returns an `OpenPBR_PreparedBsdf` ready for evaluation.
+9. Evaluate using `openpbr_eval()`, `openpbr_sample()`, or `openpbr_pdf()` with the prepared BSDF.
+10. **Advanced:** As an alternative to `openpbr_prepare_bsdf_and_volume()`, call `openpbr_prepare_volume()` and `openpbr_prepare_lobes()` separately in that order:
+   - `openpbr_prepare_volume()` must always be called first — it sets up volume properties, thin-wall behavior, and transmission tint regardless of whether volumes are enabled.
+   - `openpbr_prepare_lobes()` can then be called to prepare the BSDF lobes. It can be skipped when only the volume is needed (e.g., for shadow rays or scene-wide volume queries).
+
+---
+
+## Minimal Usage Example
+
+```cpp
+// 1. Include the entire OpenPBR BSDF
+#include "openpbr.h"
+
+// 2. Create default inputs and customize
+OpenPBR_ResolvedInputs inputs = openpbr_make_default_resolved_inputs();
+inputs.base_color = vec3(0.1f, 0.9f, 0.1f);  // green base color for illustration
+
+// 3. Prepare the BSDF and volume
+const OpenPBR_PreparedBsdf prepared = openpbr_prepare_bsdf_and_volume(inputs,
+                                                                      vec3(1.0f),                     // path throughput (for importance sampling)
+                                                                      OpenPBR_BaseRgbWavelengths_nm,  // RGB wavelengths in nanometers
+                                                                      OpenPBR_VacuumIor,              // exterior IOR
+                                                                      view_direction);                // incident direction (pointing away from surface)
+
+// 4. Sample and/or evaluate the BSDF
+vec3 light_direction;
+OpenPBR_DiffuseSpecular weight;
+float pdf;
+OpenPBR_BsdfLobeType sampled_type;
+openpbr_sample(prepared,
+               vec3(rand1, rand2, rand3),  // three independent uniform random numbers in [0,1)
+               light_direction,            // outgoing direction
+               weight,                     // BSDF * cosine / PDF
+               pdf,                        // positive if sample is valid, zero otherwise
+               sampled_type);              // the type of lobe that was sampled
+```
+
+### Standalone C++ example
+
+A self-contained example is provided in `minimal_cpp_example.cpp`. It demonstrates the core path-tracing loop — prepare the BSDF, importance-sample a new direction, and accumulate the throughput weight — with a minimal random-number generator so no external dependencies are needed beyond GLM. Build instructions are at the top of the file.
+
+---
+
+## Important Usage Notes
+
+### Coordinate Space Requirements
+
+All directional vectors and geometric data passed to the BSDF must be in a **consistent coordinate space**:
+
+- `view_direction` and `light_direction` must use the same coordinate system
+- Typically world space, but any consistent space works (object space, tangent space, etc.)
+- Shading normals and basis vectors in `OpenPBR_ResolvedInputs` must also be in this same space
+- All directions point **away from the surface** (not toward it)
+
+#### Shading Basis and Default Coordinate Frame
+
+`OpenPBR_ResolvedInputs` contains two basis fields — `shading_basis` and `coat_basis` — that are not part of the official OpenPBR parameter specification; they are required additions that describe the local coordinate frame at the surface hit point:
+
+- `shading_basis.t` — tangent vector
+- `shading_basis.b` — bitangent vector  
+- `shading_basis.n` — shading normal
+
+The default basis returned by `openpbr_make_default_resolved_inputs()` is a z-up identity frame (tangent = X, bitangent = Y, normal = Z). This is the frame assumed throughout the implementation's internal local-space calculations.
+
+In a real renderer, `shading_basis` and `coat_basis` can be populated with world-space vectors computed from the geometry at the ray–surface intersection, e.g.:
+
+```cpp
+inputs.shading_basis.t = world_tangent;    // from mesh UVs or procedural tangent
+inputs.shading_basis.b = world_bitangent;  // derived as cross(n, t) * handedness
+inputs.shading_basis.n = world_normal;     // interpolated or normal-mapped
+```
+
+As long as `view_direction`, `light_direction`, and the basis vectors are all expressed in the same space, any consistent choice of space will produce correct results.
+
+### Distance Units
+
+As per the OpenPBR specification, distances are assumed to be in world-space units. If different units are needed, unit conversions need to happen outside the BSDF code.
+
+### View Direction Consistency
+
+The `view_direction` passed to `openpbr_prepare_bsdf_and_volume()` is **cached internally** for energy compensation calculations. This means:
+
+- **The same `view_direction` must be used** for all subsequent `openpbr_eval()`, `openpbr_sample()`, and `openpbr_pdf()` calls on that prepared BSDF
+- Using a different view direction during evaluation would produce incorrect energy compensation and physically inaccurate results
+- The cached view direction is stored in `OpenPBR_PreparedBsdf.view_direction` and automatically used by eval/sample/pdf
+- If using the split initialization path (`openpbr_prepare_volume()` + `openpbr_prepare_lobes()`), ensure you store `view_direction` in the prepared struct before calling eval/sample/pdf
+
+### Volume Integration Boundary
+
+The BSDF computes low-level volume properties for subsurface scattering and transmission – specifically the extinction coefficient, single-scattering albedo, and phase function anisotropy – and exposes them as an `OpenPBR_HomogeneousVolume` in `OpenPBR_PreparedBsdf`. The actual volume integration (e.g., random walk) is left entirely to the integrator.
+
+### Path Tracing Direction
+
+This BSDF is designed for unidirectional path tracing from camera to lights. Bidirectional methods (photon mapping, light tracing) would require an adjoint BSDF with inverted square IOR scaling for transmission.
+
+### Sampling Return Behavior
+
+`openpbr_sample()` returns `void`, but indicates success/failure through the `pdf` output parameter:
+
+- **`pdf > 0`**: Valid sample generated; `light_direction` and `weight` are set
+- **`pdf == 0`**: No valid sample; output parameters are undefined
+- **`pdf` is never negative**; it's always ≥ 0
+
+Check the PDF value to determine if sampling succeeded before using the outputs.
+
+Also note that the `weight` takes into account the entire BSDF (effectively doing MIS between all of the lobes), whereas the `sampled_type` metadata is based on the lobe that actually generated the sample (and what type of scattering event occurred).
+
+### Diffuse/Specular Splits
+
+The BSDF functions return BSDF values and weights in `OpenPBR_DiffuseSpecular` format, which contains diffuse and specular components that together add up to the overall value. In cases where only the overall value is needed, it can be retrieved with `openpbr_get_sum_of_diffuse_specular()`.
+
+---
+
+## Contribution and Roadmap
+
+We welcome issues and pull requests, for example:
+
+- Enhancements to the simple demo app (with the goal of keeping it minimal, self-contained, and readable — it illustrates how to use the BSDF API, not how to build a renderer; more complex tests belong in a separate program)
+- Expanded unit tests for evaluation, sampling, and energy conservation
+- Testing of the CUDA backend, which hasn't yet been used in production code
+
+Planned or potential future work:
+
+- Specialization constants for per-lobe feature toggles exist internally but aren't yet clearly exposed to users; more specialization constants may also be added (e.g., for thin-film and thin-wall) to cover additional lobes
+- A transmission helper for translucent shadow rays exists internally but is not yet part of the public API
+- Reciprocity may be traded for better energy conservation in a future version
+- Implementing OpenPBR 1.2
+- Continued iteration on the implementation — some naming conventions and API details may evolve as this is live production code
+
+When contributing code, please follow the existing style: `snake_case` for names, `const` on every variable and parameter that won't be reassigned, and descriptive full-word names — no nonstandard abbreviations or single-letter variables except in tightly scoped math contexts.
+
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for details and guidelines.
+
+---
+
+## License
+
+This code is released under the Apache License 2.0.
