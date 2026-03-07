@@ -1,0 +1,8 @@
+# macOS metadata
+.DS_Store
+
+# Local build artifact
+minimal_cpp_example
+
+# Eclair-specific overrides
+eclair_*

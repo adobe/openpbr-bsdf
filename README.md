@@ -1,6 +1,6 @@
 # Adobe's OpenPBR BSDF
 
-A self-contained, portable implementation of the [OpenPBR 1.0](https://academysoftwarefoundation.github.io/OpenPBR/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
+A self-contained, portable implementation of the [OpenPBR 1.0](https://openpbr.org/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
 
 ---
 
@@ -284,7 +284,7 @@ Planned or potential future work:
 
 When contributing code, please follow the existing style: `snake_case` for names, `const` on every variable and parameter that won't be reassigned, and descriptive full-word names — no nonstandard abbreviations or single-letter variables except in tightly scoped math contexts.
 
-Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for details and guidelines.
+Please refer to [CONTRIBUTING.md](https://github.com/adobe/.github/blob/main/.github/CONTRIBUTING.md) for details and guidelines.
 
 ---
 
