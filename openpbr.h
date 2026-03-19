@@ -26,8 +26,8 @@
 // for physically-based material description; see https://academysoftwarefoundation.github.io/OpenPBR/
 //
 // The system is designed to be easy to integrate: this single header is the only
-// include needed. It brings in everything — types, constants, settings, interop,
-// and the full BSDF API — with no external dependencies (C++ users must pre-include GLM).
+// include needed. It brings in everything - types, constants, settings, interop,
+// and the full BSDF API - with no external dependencies (C++ users must pre-include GLM).
 //
 // The implementation is written in portable GLSL-like syntax and compiles unmodified
 // for GLSL, C++, MSL, CUDA, and Slang via a thin cross-language interop layer.
@@ -36,6 +36,7 @@
 //
 // Sub-headers included by this file, in order:
 //   - openpbr_settings.h              compile-time configuration and feature flags
+//   - openpbr_data_constants.h        LUT dimensions and LUT ID constants
 //   - interop/openpbr_interop.h       cross-language macro layer
 //   - openpbr_resolved_inputs.h       OpenPBR_ResolvedInputs struct and default initializer
 //   - openpbr_constants.h             physical and material constants
@@ -46,6 +47,9 @@
 
 // Configuration and compile-time settings
 #include "openpbr_settings.h"
+
+// LUT dimensions and LUT ID constants (public API for texture mode)
+#include "openpbr_data_constants.h"
 
 // Cross-language interop macros
 #include "interop/openpbr_interop.h"

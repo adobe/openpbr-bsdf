@@ -20,7 +20,7 @@
 // Only include the data array when not using texture-based lookups.
 #if !OPENPBR_USE_TEXTURE_LUTS
 
-#include "openpbr_data_constants.h"
+#include "../../openpbr_data_constants.h"
 
 // ==================================================================================
 // Linearly Transformed Cosines (LTC) Lookup Table
@@ -44,7 +44,7 @@
 //
 // ==================================================================================
 
-CONSTEXPR_GLOBAL vec3 OpenPBR_LTC_Array[OpenPBR_LTCTableSize * OpenPBR_LTCTableSize] = {
+OPENPBR_CONSTEXPR_GLOBAL vec3 OpenPBR_LTC_Array[OpenPBR_LTCTableSize * OpenPBR_LTCTableSize] = {
 #include "openpbr_ltc_data.h"
 };
 

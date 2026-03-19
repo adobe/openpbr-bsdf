@@ -41,20 +41,20 @@ struct OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE
     OPENPBR_REFLECTION_COEFFICIENT_TYPE refl_trans_coeff;
 };
 
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
                              const vec3 normal_ff,
                              const OPENPBR_MICROFACET_DISTRIBUTION_TYPE microfacet_distr,
                              const OPENPBR_REFLECTION_COEFFICIENT_TYPE refl_trans_coeff)
 {
-    lobe = MAKE_STRUCT_3(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE, normal_ff, microfacet_distr, refl_trans_coeff);
+    lobe = OPENPBR_MAKE_STRUCT_3(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE, normal_ff, microfacet_distr, refl_trans_coeff);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe)
 {
     return OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -83,7 +83,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     }
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -116,18 +116,18 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_
     }
 }
 
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     const float idotn = dot(view_direction, lobe.normal_ff);
 
     // Choose microfacet normal_ff (in world space).
-    const vec3 half_vector = openpbr_sample_ggx_smith_vndf(lobe.microfacet_distr, view_direction, lobe.normal_ff, SWIZZLE(rand, xy));
+    const vec3 half_vector = openpbr_sample_ggx_smith_vndf(lobe.microfacet_distr, view_direction, lobe.normal_ff, OPENPBR_SWIZZLE(rand, xy));
 
     const float idoth = dot(view_direction, half_vector);
     // Sampled microfacet normal is expected to be in incident hemisphere,
@@ -171,7 +171,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFAC
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

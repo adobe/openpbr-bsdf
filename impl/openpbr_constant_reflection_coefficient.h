@@ -32,32 +32,35 @@ struct OpenPBR_ConstantReflectionCoefficient
     vec3 color;  // the constant color used for reflection
 };
 
-vec3 openpbr_reflection_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff, const float idoth)
+vec3 openpbr_reflection_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+                                    const float idoth)
 {
     return refl_trans_coeff.color;
 }
 
-vec3 openpbr_transmission_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff, const float idoth)
+vec3 openpbr_transmission_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+                                      const float idoth)
 {
     return vec3(0.0f);
 }
 
 // The default implementations of the reflection and transmission probabilities use both coefficients.
 // Specialized implementations could calculate both based on the same shared factors (such as fresnel and 1-fresnel).
-OpenPBR_AllCoefficients openpbr_all_coefficients(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+OpenPBR_AllCoefficients openpbr_all_coefficients(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient)
+                                                     refl_trans_coeff,
                                                  const float idoth)
 {
-    return MAKE_STRUCT_2(OpenPBR_AllCoefficients, refl_trans_coeff.color, vec3(0.0f));
+    return OPENPBR_MAKE_STRUCT_2(OpenPBR_AllCoefficients, refl_trans_coeff.color, vec3(0.0f));
 }
 
-float openpbr_reflection_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+float openpbr_reflection_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
                                      const vec3 path_throughput,
                                      const float idoth)
 {
     return 1.0f;
 }
 
-float openpbr_transmission_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+float openpbr_transmission_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
                                        const vec3 path_throughput,
                                        const float idoth)
 {
@@ -65,25 +68,25 @@ float openpbr_transmission_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Co
 }
 
 OpenPBR_AllCoefficientsAndProbabilities
-openpbr_all_coefficients_and_probabilities(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+openpbr_all_coefficients_and_probabilities(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
                                            const vec3 path_throughput,
                                            const float idoth)
 {
-    return MAKE_STRUCT_4(OpenPBR_AllCoefficientsAndProbabilities, refl_trans_coeff.color, vec3(0.0f), 1.0f, 0.0f);
+    return OPENPBR_MAKE_STRUCT_4(OpenPBR_AllCoefficientsAndProbabilities, refl_trans_coeff.color, vec3(0.0f), 1.0f, 0.0f);
 }
 
-float openpbr_estimate_weight(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+float openpbr_estimate_weight(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
                               const vec3 path_throughput,
                               const float idotn)
 {
     return openpbr_max_component_of_throughput_weighted_color(path_throughput, refl_trans_coeff.color);
 }
 
-float openpbr_estimate_weight_when_applied_to_ggx_microfacet_distribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ConstantReflectionCoefficient)
-                                                                              refl_trans_coeff,
-                                                                          const vec3 path_throughput,
-                                                                          const float idotn,
-                                                                          const float isotropic_alpha)
+float openpbr_estimate_weight_when_applied_to_ggx_microfacet_distribution(
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ConstantReflectionCoefficient) refl_trans_coeff,
+    const vec3 path_throughput,
+    const float idotn,
+    const float isotropic_alpha)
 {
     // We don't currently have a way to calculate the average albedo of this constant color reflection coefficient
     // applied to a GGX microfacet distribution, so we just estimate the weight assuming a smooth surface.

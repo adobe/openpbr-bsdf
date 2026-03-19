@@ -22,7 +22,7 @@
 
 #include "../openpbr_constants.h"
 #include "../openpbr_diffuse_specular.h"
-#include "data/openpbr_data_constants.h"
+#include "../openpbr_data_constants.h"
 #include "openpbr_coating_lobe.h"
 #include "openpbr_lobe_utils.h"
 #include "openpbr_math.h"
@@ -195,7 +195,8 @@ vec3 openpbr_disney_sheen_sample_ltc(const vec3 ltc_coeffs, const vec2 rand)
 }
 
 // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
-vec3 openpbr_disney_sheen_fetch_coeffs(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe, const vec3 direction_lsn)
+vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+                                       const vec3 direction_lsn)
 {
     // LTC coefficients are stored in a table parameterized by these variables:
     //
@@ -211,11 +212,11 @@ vec3 openpbr_disney_sheen_fetch_coeffs(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Fu
     // we compensate the difference between bilinear interpolation in that table and in a regular texture by:
     //     - keeping the original sampling indices.
     //     - offsetting the UVs by 0.5 (in pixel space).
-    CONSTEXPR_LOCAL vec2 uv_max =
+    OPENPBR_CONSTEXPR_LOCAL vec2 uv_max =
         vec2(float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize), float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize));
-    CONSTEXPR_LOCAL vec2 uv_step = vec2(0.5f / float(OpenPBR_LTCTableSize), 0.5f / float(OpenPBR_LTCTableSize));
+    OPENPBR_CONSTEXPR_LOCAL vec2 uv_step = vec2(0.5f / float(OpenPBR_LTCTableSize), 0.5f / float(OpenPBR_LTCTableSize));
     const vec2 uv = vec2(openpbr_get_cos_theta_ls(direction_lsn), lobe.alpha) * uv_max + uv_step;
-    return SWIZZLE(texture(GET_2D_TEXTURE(GET_BINDING(utility_texture_indices).m_openpbr_linearly_transformed_cosines_texture_handle), uv), xyz);
+    return OPENPBR_SWIZZLE(OPENPBR_SAMPLE_2D_TEXTURE(OpenPBR_LutId_LTC, uv), xyz);
 #else
     // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
     // This exactly matches Disney's SheenLTC::fetchCoeffs implementation.
@@ -251,7 +252,9 @@ vec3 openpbr_disney_sheen_fetch_coeffs(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Fu
 /////////////////////////////////////
 
 // Evaluate the BRDF.
-vec3 openpbr_disney_sheen_f(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe, const vec3 wo_lsn, const vec3 wi_lsn)
+vec3 openpbr_disney_sheen_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+                            const vec3 wo_lsn,
+                            const vec3 wi_lsn)
 {
     const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn);
     const float cos_theta_i = openpbr_get_cos_theta_ls(wi_lsn);
@@ -288,10 +291,10 @@ vec3 openpbr_disney_sheen_f(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_Coat
 // Sample proportionally to the BRDF.
 // The LTC representation allows perfect importance sampling.
 // Returns whether a valid sample was successfully generated.
-bool openpbr_disney_sheen_sample_f(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+bool openpbr_disney_sheen_sample_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                    const vec2 rand,
                                    const vec3 wo_lsn,
-                                   ADDRESS_SPACE_THREAD OUT(vec3) wi_lsn)
+                                   OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) wi_lsn)
 {
     const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn);
     if (cos_theta_o < 0.0f)
@@ -314,7 +317,9 @@ bool openpbr_disney_sheen_sample_f(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLo
 }
 
 // Sampling density associated with the "disney_sheen_sample_f" function above. Used for MIS.
-float openpbr_disney_sheen_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe, const vec3 wo_lsn, const vec3 wi_lsn)
+float openpbr_disney_sheen_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+                               const vec3 wo_lsn,
+                               const vec3 wi_lsn)
 {
     const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn), cos_theta_i = openpbr_get_cos_theta_ls(wi_lsn);
     if (cos_theta_o < 0.0f || cos_theta_i < 0.0f)
@@ -332,7 +337,8 @@ float openpbr_disney_sheen_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_C
 // GENERAL SHEEN LOBE FRAMEWORK ADAPTED FOR DISNEY SHEEN //
 ///////////////////////////////////////////////////////////
 
-float openpbr_proportion_reflected(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe, const vec3 direction_lsn)
+float openpbr_proportion_reflected(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+                                   const vec3 direction_lsn)
 {
     // The implementation of this function uses the conventions of the core Disney sheen functions.
     //
@@ -350,19 +356,19 @@ float openpbr_proportion_reflected(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLo
     return lobe.presence * r;
 }
 
-float openpbr_base_layer_scale_incoming(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe)
+float openpbr_base_layer_scale_incoming(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe)
 {
     return 1.0f - lobe.view_reflected;
 }
 
-float openpbr_base_layer_scale_outgoing(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+float openpbr_base_layer_scale_outgoing(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                         const vec3 light_direction_lsn)
 {
     const float light_reflected = openpbr_proportion_reflected(lobe, light_direction_lsn);
     return 1.0f - light_reflected;
 }
 
-float openpbr_base_layer_scale_complete(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+float openpbr_base_layer_scale_complete(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                         const vec3 light_direction_lsn)
 {
     const float incoming = openpbr_base_layer_scale_incoming(lobe);
@@ -370,14 +376,15 @@ float openpbr_base_layer_scale_complete(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_F
     return incoming * outgoing;
 }
 
-float openpbr_sheen_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe, const vec3 view_direction)
+float openpbr_sheen_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+                                const vec3 view_direction)
 {
     // Here we calculate the expected contribution of the sheen lobe relative to the overall lobe
     // and we use that to set the probability of sampling the sheen lobe.
 
     // TODO: Take the real path throughput into account (for both standalone lobes),
     //       either by saving it in the lobe struct or by passing it in.
-    CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
+    OPENPBR_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
 
     const float sheen_contribution = lobe.view_reflected * lobe.presence * openpbr_max3(lobe.tint);
 
@@ -388,7 +395,7 @@ float openpbr_sheen_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_
 }
 
 // Assumes that child lobe has already been initialized.
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                              const vec3 normal_ff_wsn,
                              const vec3 view_direction_wsn,
                              const float roughness,
@@ -405,12 +412,12 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_FuzzLobe_Coating
     lobe.view_reflected = openpbr_proportion_reflected(lobe, lobe.view_dir_lsn);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe)
 {
     return OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection | openpbr_get_lobe_type(lobe.coating_lobe);
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -423,7 +430,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
                                         openpbr_make_diffuse_specular_from_specular(sheen_value));
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -441,13 +448,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe
 // evaluate the throughput and pdf for this direction,
 // and return whether a sample was successfully generated.
 // Output arguments are only set when the function returns true.
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     const float sheen_prob = openpbr_sheen_probability(lobe, view_direction);
     const float base_prob = 1.0f - sheen_prob;
@@ -517,7 +524,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_Coating
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

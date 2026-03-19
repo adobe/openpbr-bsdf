@@ -27,7 +27,7 @@ struct OpenPBR_Basis
     vec3 t, b, n;
 };
 
-INLINE_FUNCTION OpenPBR_Basis openpbr_make_identity_basis()
+OPENPBR_INLINE_FUNCTION OpenPBR_Basis openpbr_make_identity_basis()
 {
     OpenPBR_Basis basis;
 
@@ -39,9 +39,9 @@ INLINE_FUNCTION OpenPBR_Basis openpbr_make_identity_basis()
 }
 
 // The input normal needs to be unit length.
-INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal)
+OPENPBR_INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal)
 {
-    ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
+    OPENPBR_ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
     OpenPBR_Basis basis;
     basis.n = normal;
 
@@ -59,10 +59,10 @@ INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal)
 }
 
 // The input normal needs to be unit length.
-INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 tangent, const float handedness)
+OPENPBR_INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 tangent, const float handedness)
 {
-    ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
-    ASSERT(handedness == 1.0f || handedness == -1.0f, "[openpbr_make_basis] invalid handedness");
+    OPENPBR_ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
+    OPENPBR_ASSERT(handedness == 1.0f || handedness == -1.0f, "[openpbr_make_basis] invalid handedness");
     OpenPBR_Basis basis;
 
     basis.n = normal;
@@ -73,13 +73,13 @@ INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 t
 }
 
 // The input normal needs to be unit length.
-INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 tangent, const vec3 bitangent)
+OPENPBR_INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 tangent, const vec3 bitangent)
 {
     // Orthonormalize the input vectors using the modified Gram-Schmidt process
     // (which is more numerically stable than the classical Gram-Schmidt process).
     // For details, see https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability.
 
-    ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
+    OPENPBR_ASSERT(openpbr_is_normalized(normal), "[openpbr_make_basis] unnormalized input normal");
 
     const vec3 new_tangent = openpbr_fast_normalize(tangent - dot(tangent, normal) * normal);  // make tangent perpendicular to normal
     const vec3 intermediate_bitangent = bitangent - dot(bitangent, normal) * normal;           // make bitangent perpendicular to normal
@@ -95,25 +95,27 @@ INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal, const vec3 t
     return basis;
 }
 
-INLINE_FUNCTION void openpbr_invert_basis(ADDRESS_SPACE_THREAD INOUT(OpenPBR_Basis) basis)
+OPENPBR_INLINE_FUNCTION void openpbr_invert_basis(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_Basis) basis)
 {
     basis.t *= -1.0f;
     basis.b *= -1.0f;
     basis.n *= -1.0f;
 }
 
-INLINE_FUNCTION float openpbr_get_basis_handedness(const vec3 normal, const vec3 tangent, const vec3 bitangent)
+OPENPBR_INLINE_FUNCTION float openpbr_get_basis_handedness(const vec3 normal, const vec3 tangent, const vec3 bitangent)
 {
     return dot(cross(tangent, bitangent), normal) >= 0.0f ? 1.0f : -1.0f;
 }
 
-INLINE_FUNCTION float openpbr_get_basis_handedness(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Basis) basis)
+OPENPBR_INLINE_FUNCTION float openpbr_get_basis_handedness(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Basis) basis)
 {
     return openpbr_get_basis_handedness(basis.n, basis.t, basis.b);
 }
 
 // Rotates counterclockwise around the normal.
-INLINE_FUNCTION void openpbr_rotate_basis_around_normal(ADDRESS_SPACE_THREAD INOUT(OpenPBR_Basis) basis, vec2 cos_sin, float handedness)
+OPENPBR_INLINE_FUNCTION void openpbr_rotate_basis_around_normal(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_Basis) basis,
+                                                                vec2 cos_sin,
+                                                                float handedness)
 {
     const vec3 rotated_tangent = basis.t * cos_sin.x + handedness * basis.b * cos_sin.y;
     const vec3 rotated_bitangent = basis.b * cos_sin.x - handedness * basis.t * cos_sin.y;
@@ -121,24 +123,24 @@ INLINE_FUNCTION void openpbr_rotate_basis_around_normal(ADDRESS_SPACE_THREAD INO
     basis.b = rotated_bitangent;
 }
 
-INLINE_FUNCTION void openpbr_rotate_basis_around_normal(ADDRESS_SPACE_THREAD INOUT(OpenPBR_Basis) basis, vec2 cos_sin)
+OPENPBR_INLINE_FUNCTION void openpbr_rotate_basis_around_normal(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_Basis) basis, vec2 cos_sin)
 {
     openpbr_rotate_basis_around_normal(basis, cos_sin, openpbr_get_basis_handedness(basis));
 }
 
-INLINE_FUNCTION void openpbr_rotate_basis_around_normal(ADDRESS_SPACE_THREAD INOUT(OpenPBR_Basis) basis, float radians)
+OPENPBR_INLINE_FUNCTION void openpbr_rotate_basis_around_normal(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_Basis) basis, float radians)
 {
     const float sine = sin(radians);
     const float cosine = cos(radians);
     openpbr_rotate_basis_around_normal(basis, vec2(cosine, sine));
 }
 
-INLINE_FUNCTION vec3 openpbr_world_to_local(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Basis) basis, const vec3 direction)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_world_to_local(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Basis) basis, const vec3 direction)
 {
     return vec3(dot(direction, basis.t), dot(direction, basis.b), dot(direction, basis.n));
 }
 
-INLINE_FUNCTION vec3 openpbr_local_to_world(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Basis) basis, const vec3 direction)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_local_to_world(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Basis) basis, const vec3 direction)
 {
     return direction.x * basis.t + direction.y * basis.b + direction.z * basis.n;
 }

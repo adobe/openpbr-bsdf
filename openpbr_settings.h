@@ -18,10 +18,39 @@
 #define OPENPBR_SETTINGS_H
 
 // ======================================
+// OpenPBR Configuration Surface Overview
+// ======================================
+//
+// Most users only need one setting:
+//   - OPENPBR_USE_TEXTURE_LUTS        — 0 (default, self-contained arrays) or 1 (GPU textures)
+//
+// Auto-configured; override only if the default is wrong for your target:
+//   - OPENPBR_LANGUAGE_TARGET_*        — auto-detected from compiler macros; set explicitly for Slang
+//
+// Optional performance hooks — define any of these to supply a faster platform-specific
+// implementation (GPU hardware intrinsics, CPU approximations, etc.):
+//   - OPENPBR_FAST_RCP_SQRT(x), OPENPBR_FAST_SQRT(x), OPENPBR_FAST_NORMALIZE(v)
+//
+// Conflict-suppression hooks — set to 1 if your host already defines these:
+//   - OPENPBR_USE_CUSTOM_SATURATE      — suppress OpenPBR's saturate() shim
+//   - OPENPBR_USE_CUSTOM_VEC_TYPES     — suppress vec2/vec3/vec4 aliases and GLM using-declarations
+//
+// GPU pipeline hooks — override both if your renderer has a real specialization constant pipeline:
+//   - OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default_value)
+//   - OPENPBR_GET_SPECIALIZATION_CONSTANT(name)
+//
+// Advanced escape hatches — rarely needed:
+//   - OPENPBR_ASSERT(expr, message)        — redirect runtime assertions
+//   - OPENPBR_ASSERT_UNREACHABLE(message)  — redirect unreachable-branch assertions
+//     (pre-defining both also suppresses #include <cassert> in the C++ backend)
+//   - OPENPBR_STATIC_ASSERT(expr, message) — redirect static assertions
+//   - OPENPBR_USE_CUSTOM_INTEROP           — replace the entire interop layer
+
+// ======================================
 // Lookup Table Access Mode Configuration
 // ======================================
 //
-// The OpenPBR BSDF uses precomputed lookup tables (LUTs) for:
+// This OpenPBR BSDF implementation uses precomputed lookup tables (LUTs) for:
 //   - Linearly Transformed Cosines (LTC) coefficients for the fuzz lobe
 //   - Energy compensation tables for microfacet multiple scattering
 //
@@ -44,12 +73,25 @@
 //   - Requires host code to create and bind textures
 //   - Best performance on GPU (hardware interpolation, filtering, caching)
 //   - Used by Eclair renderer and other texture-capable renderers
-//   - Requires the following macros to be defined before including openpbr.h:
-//       GET_2D_TEXTURE(handle)  — resolves a texture handle to a 2D sampler
-//       GET_3D_TEXTURE(handle)  — resolves a texture handle to a 3D sampler
-//       GET_BINDING(name)       — accesses a shader binding by name
-//     These are renderer-specific. Eclair defines them in texture_func.h and
-//     glsl_interop_begin.h. The headers will emit a clear error if they are missing.
+//   - Requires the following renderer-provided macros to be defined before openpbr.h:
+//
+//       OPENPBR_SAMPLE_2D_TEXTURE(lut_id, uv)
+//           Given an OpenPBR LUT ID (one of the OpenPBR_LutId_* constants defined in
+//           openpbr_data_constants.h) and a vec2 UV, samples the corresponding
+//           2D texture and returns a vec4. OpenPBR reads the result via .r (scalar tables)
+//           or .xyz (the LTC table); pack data in those components accordingly.
+//
+//       OPENPBR_SAMPLE_3D_TEXTURE(lut_id, uvw)
+//           Same contract, but for the two 3D energy tables
+//           (OpenPBR_LutId_IdealDielectricEnergyComplement = 0,
+//            OpenPBR_LutId_OpaqueDielectricEnergyComplement = 3).
+//           Returns a vec4; OpenPBR accesses the result via .r.
+//
+//   OpenPBR defines eight texture IDs (integer constants, 0–7) in
+//   openpbr_data_constants.h. Renderers that store OpenPBR textures
+//   consecutively in a bindless array can use these IDs directly as slot offsets.
+//
+//   The headers will emit a clear error if any of these macros are missing.
 //
 // Example for renderers with texture support:
 //   #define OPENPBR_USE_TEXTURE_LUTS 1
@@ -61,105 +103,104 @@
 
 // When texture LUT mode is enabled, validate that all required renderer macros are present.
 #if OPENPBR_USE_TEXTURE_LUTS
-#ifndef GET_2D_TEXTURE
-#error "OPENPBR_USE_TEXTURE_LUTS = 1 requires GET_2D_TEXTURE to be defined before including openpbr.h."
+#ifndef OPENPBR_SAMPLE_2D_TEXTURE
+#error "OPENPBR_USE_TEXTURE_LUTS = 1 requires OPENPBR_SAMPLE_2D_TEXTURE to be defined before including openpbr.h."
 #endif
-#ifndef GET_3D_TEXTURE
-#error "OPENPBR_USE_TEXTURE_LUTS = 1 requires GET_3D_TEXTURE to be defined before including openpbr.h."
-#endif
-#ifndef GET_BINDING
-#error "OPENPBR_USE_TEXTURE_LUTS = 1 requires GET_BINDING to be defined before including openpbr.h."
+#ifndef OPENPBR_SAMPLE_3D_TEXTURE
+#error "OPENPBR_USE_TEXTURE_LUTS = 1 requires OPENPBR_SAMPLE_3D_TEXTURE to be defined before including openpbr.h."
 #endif
 #endif
 
-// ====================================
-// Energy Table Data Type Configuration
-// ====================================
+// ===============
+// Fast Math Hooks
+// ===============
 //
-// Energy compensation tables store normalized values in the [0, 65535] range.
-// This setting controls the integer type used for storage:
+// A few hot-path functions — reciprocal square root, square root, and normalize — can be
+// overridden with faster platform-specific implementations (GPU hardware intrinsics, CPU
+// approximations, etc.). Define any of the macros below before including openpbr.h;
+// any undefined macro falls back to the standard library default.
 //
-// OPENPBR_ENERGY_TABLES_USE_UINT16 = 0 (uint, Default)
-//   - Uses 32-bit unsigned integers (uint)
-//   - Compatible with all shading languages (GLSL, MSL, C++, CUDA, Slang)
-//   - Larger memory footprint (4 bytes per element)
-//   - Default for maximum portability
+//   OPENPBR_FAST_RCP_SQRT(x)     — fast 1/sqrt(x) for float x
+//   OPENPBR_FAST_SQRT(x)         — fast sqrt(x) for float x  (also applied component-wise to vec3)
+//   OPENPBR_FAST_NORMALIZE(v)    — fast normalize(v) for vec3 v
 //
-// OPENPBR_ENERGY_TABLES_USE_UINT16 = 1 (unsigned short)
-//   - Uses 16-bit unsigned short integers
-//   - Only supported in MSL, C++, CUDA, and Slang (NOT GLSL core)
-//   - More memory efficient (2 bytes per element)
-//   - Reduces shader binary size and memory bandwidth
-//
-// Note: The actual data values remain in [0, 65535] range regardless of storage type.
-//       The normalization constant is always 65535.0f.
-//
-// TODO: Automatically set this based on selected shading language in the future.
-//
-// Example for Metal/C++/CUDA:
-//   #define OPENPBR_ENERGY_TABLES_USE_UINT16 1
+// Example:
+//   #define OPENPBR_FAST_RCP_SQRT(x)  fast_rcp_sqrt(x)
+//   #define OPENPBR_FAST_SQRT(x)      fast_sqrt(x)
+//   #define OPENPBR_FAST_NORMALIZE(v) fast_normalize(v)
 //   #include "openpbr.h"
 //
-#ifndef OPENPBR_ENERGY_TABLES_USE_UINT16
-#define OPENPBR_ENERGY_TABLES_USE_UINT16 0
+// The defaults are declared in impl/openpbr_math.h using #ifndef guards.
+//
+
+// ==========================
+// Custom saturate() Override
+// ==========================
+// This library defines saturate(float) and saturate(vec3) shims in the C++, GLSL, and CUDA
+// interop backends (MSL and Slang have language built-ins and emit no shim).
+//
+// OPENPBR_USE_CUSTOM_SATURATE = 0 (Default)
+//   - This library provides its own saturate() implementations.
+//
+// OPENPBR_USE_CUSTOM_SATURATE = 1
+//   - This library skips its saturate() definitions entirely.
+//   - Use this when your host codebase already defines saturate() to avoid
+//     a redefinition error.
+//
+// Example:
+//   #define OPENPBR_USE_CUSTOM_SATURATE 1
+//   #include "openpbr.h"
+//
+#ifndef OPENPBR_USE_CUSTOM_SATURATE
+#define OPENPBR_USE_CUSTOM_SATURATE 0
 #endif
 
-// ============================================
-// Fast Math Approximations Configuration
-// ============================================
+// ==============================
+// Custom vec2/vec3/vec4 Override
+// ==============================
 //
-// The OpenPBR BSDF uses a few hot-path math operations that can safely be accelerated
-// with approximations in some cases: reciprocal square root, square root, and normalize.
+// Several interop backends define GLSL-compatible names to bridge their native types
+// and functions to the names used by OpenPBR code:
 //
-// OPENPBR_USE_FAST_MATH_APPROXIMATIONS = 0 (Standard Math, Default)
-//   - Uses precise standard library implementations: 1/sqrt(x), sqrt(x), normalize(v)
-//   - Self-contained: no additional includes or user-defined functions required
+//   MSL, CUDA, Slang  — define vec2/vec3/vec4 as aliases for float2/float3/float4.
+//   C++ (GLM)         — also imports abs(), cross(), dot(), mix(), smoothstep(), etc.
+//                       from the glm:: namespace via using-declarations.
+//   GLSL              — vec2/vec3/vec4 are language built-ins; this setting has no
+//                       effect for the GLSL backend.
 //
-// OPENPBR_USE_FAST_MATH_APPROXIMATIONS = 1 (Fast Approximations)
-//   - openpbr_math.h skips its standard fallback definitions
-//   - The caller must define these functions before including openpbr.h:
-//       INLINE_FUNCTION float openpbr_fast_rcp_sqrt(const float x)  // fast 1/sqrt
-//       INLINE_FUNCTION float openpbr_fast_sqrt(const float x)      // fast sqrt
-//       INLINE_FUNCTION vec3  openpbr_fast_sqrt(const vec3 v)       // fast componentwise sqrt
-//       INLINE_FUNCTION vec3  openpbr_fast_normalize(const vec3 v)  // fast normalize
+// OPENPBR_USE_CUSTOM_VEC_TYPES = 0 (Default)
+//   - The above aliases and using-declarations are emitted by the interop header.
 //
-// Example (define your implementations, then include openpbr.h):
-//   #define OPENPBR_USE_FAST_MATH_APPROXIMATIONS 1
-//   INLINE_FUNCTION float openpbr_fast_rcp_sqrt(const float x) { ... }
-//   ...
+// OPENPBR_USE_CUSTOM_VEC_TYPES = 1
+//   - All of the above are suppressed.
+//   - Use this when the host environment already provides these GLSL-compatible names
+//     to avoid redefinition or ambiguous-overload errors.
+//   - In C++/GLM mode, GLM functions that take GLM-typed arguments remain accessible
+//     through argument-dependent lookup (ADL) even without the using-declarations.
+//
+// Example:
+//   #define OPENPBR_USE_CUSTOM_VEC_TYPES 1
 //   #include "openpbr.h"
 //
-#ifndef OPENPBR_USE_FAST_MATH_APPROXIMATIONS
-#define OPENPBR_USE_FAST_MATH_APPROXIMATIONS 0
+#ifndef OPENPBR_USE_CUSTOM_VEC_TYPES
+#define OPENPBR_USE_CUSTOM_VEC_TYPES 0
 #endif
 
 // ==========================================
-// Cross-Language Interop Macro Configuration
+// Custom Interop Override (Advanced)
 // ==========================================
 //
-// OpenPBR BSDF is designed to work across multiple shading languages:
-//   - GLSL (OpenGL/Vulkan shaders)
-//   - MSL (Metal Shading Language)
-//   - C++ (CPU path tracers with GLM)
-//   - CUDA (NVIDIA GPU compute)
-//   - Slang (cross-platform shading language)
+// This OpenPBR BSDF implementation uses abstraction macros for language-specific features
+// (OPENPBR_ADDRESS_SPACE_THREAD, OPENPBR_OUT(), OPENPBR_CONSTEXPR_LOCAL, OPENPBR_UINT32,
+// OPENPBR_UINT16, vec2/vec3/vec4, etc.). By default it provides its own interop
+// definitions in interop/openpbr_interop.h.
 //
-// The BSDF uses abstraction macros for language-specific features:
-//   - ADDRESS_SPACE_THREAD (memory qualifiers)
-//   - OUT(), INOUT(), CONST_REF() (parameter passing)
-//   - CONSTEXPR_LOCAL, CONSTEXPR_GLOBAL (constants)
-//   - vec2, vec3, vec4 (math types)
-//   - And more...
+// Most renderers should leave this at 0 and use OPENPBR_USE_CUSTOM_SATURATE /
+// OPENPBR_USE_CUSTOM_VEC_TYPES for targeted suppressions. Set this to 1 only if you need
+// to replace the entire interop layer — e.g., your renderer already provides every macro
+// OpenPBR requires. No validation is performed when this is 1.
 //
-// By default, OpenPBR provides its own interop macro definitions in:
-//   interop/openpbr_interop.h
-//
-// To use your own custom interop system (e.g., from an existing renderer):
-//   1. Set OPENPBR_USE_CUSTOM_INTEROP = 1
-//   2. Define all required macros before including openpbr.h
-//   3. OpenPBR will validate that macros are defined but won't define them itself
-//
-// Example with custom macros:
+// Example:
 //   #define OPENPBR_USE_CUSTOM_INTEROP 1
 //   #include "your_custom_interop.h"
 //   #include "openpbr.h"
@@ -168,11 +209,61 @@
 #define OPENPBR_USE_CUSTOM_INTEROP 0
 #endif
 
+// =============================
+// Specialization Constant Hooks
+// =============================
+//
+// OpenPBR uses specialization constants to eliminate dead code paths for disabled
+// features at pipeline-specialization time. All four constants default to 'true':
+//   EnableSheenAndCoat, EnableDispersion, EnableTranslucency, EnableMetallic
+//
+// Two macros control declaration and access. Their defaults produce plain compile-time
+// booleans, which is correct for offline renderers and standalone use. GPU renderers with
+// a real specialization constant pipeline should override both before including openpbr.h.
+// The interop headers define the defaults only if neither macro is already defined.
+//
+//   OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default_value)
+//       Default: 'static inline constexpr bool name = default_value'
+//       Override to wire up Vulkan layout(constant_id = id), Metal function_constant,
+//       CPU runtime dispatch tables, etc.
+//
+//   OPENPBR_GET_SPECIALIZATION_CONSTANT(name)
+//       Default: 'name'  (returns the compile-time boolean directly)
+//       Override to read the value through your renderer's dispatch mechanism.
+//
+// Example override (before including openpbr.h):
+//   #define OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default) ...
+//   #define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) ...
+//   #include "openpbr.h"
+//
+
+// =======================
+// Custom Assertion Hooks
+// =======================
+//
+// Pre-define any of these before including openpbr.h to redirect assertions to a custom system:
+//
+//   OPENPBR_ASSERT(expr, message)        — runtime assertion (independent guard).
+//   OPENPBR_ASSERT_UNREACHABLE(message)  — unreachable-branch assertion (independent guard).
+//   OPENPBR_STATIC_ASSERT(expr, message) — compile-time assertion (independent guard).
+//
+// Example:
+//   #define OPENPBR_ASSERT(expr, message)        MY_ASSERT(expr, message)
+//   #define OPENPBR_ASSERT_UNREACHABLE(message)  MY_ASSERT(false, message)
+//   #define OPENPBR_STATIC_ASSERT(expr, message) MY_STATIC_ASSERT(expr, message)
+//   #include "openpbr.h"
+//
+// The defaults are defined with #ifndef guards in all interop backends so they can be
+// overridden. The C++ backend additionally suppresses #include <cassert> when both
+// OPENPBR_ASSERT and OPENPBR_ASSERT_UNREACHABLE are pre-defined, since assert.h's
+// extern "C" linkage specification is illegal at C++ class scope.
+//
+
 // =========================
 // Language Target Selection
 // =========================
 //
-// When OPENPBR_USE_CUSTOM_INTEROP = 0, OpenPBR needs to know which shading language to target.
+// When OPENPBR_USE_CUSTOM_INTEROP = 0, this library needs to know which shading language to target.
 // You can explicitly set the target language using one of these defines:
 //
 //   #define OPENPBR_LANGUAGE_TARGET_CPP 1      // C++ with GLM
@@ -181,7 +272,10 @@
 //   #define OPENPBR_LANGUAGE_TARGET_MSL 1      // Metal Shading Language
 //   #define OPENPBR_LANGUAGE_TARGET_SLANG 1    // Slang
 //
-// If you don't set any explicit target, OpenPBR will auto-detect based on compiler defines:
+// Note: There is no dedicated OPENPBR_LANGUAGE_TARGET_HLSL.
+// For HLSL-style pipelines, use Slang and set OPENPBR_LANGUAGE_TARGET_SLANG = 1.
+//
+// If you don't set any explicit target, this library will auto-detect based on compiler defines:
 //   - __CUDACC__ -> CUDA
 //   - __METAL_VERSION__ -> MSL
 //   - __cplusplus -> C++

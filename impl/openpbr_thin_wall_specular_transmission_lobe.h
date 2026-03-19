@@ -45,7 +45,7 @@ struct OpenPBR_ThinWallSpecularTransmissionLobe
 #undef OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE
 
 // Initialize the inner specular lobe with flipped normal, flipped microfacet-distribution basis, and reflected view direction.
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_ThinWallSpecularTransmissionLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_ThinWallSpecularTransmissionLobe) lobe,
                              const vec3 normal_ff,
                              const OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution microfacet_distr,
                              const vec3 trans_color)
@@ -54,7 +54,7 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_ThinWallSpecular
     OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution flipped_microfacet_distr = microfacet_distr;
     flipped_microfacet_distr.basis_ff.n *= -1.0f;  // only necessary to flip the normal
     openpbr_initialize_lobe(
-        lobe.flipped_lobe, flipped_normal, flipped_microfacet_distr, MAKE_STRUCT_1(OpenPBR_ConstantReflectionCoefficient, trans_color));
+        lobe.flipped_lobe, flipped_normal, flipped_microfacet_distr, OPENPBR_MAKE_STRUCT_1(OpenPBR_ConstantReflectionCoefficient, trans_color));
 }
 
 #define OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE OpenPBR_ThinWallSpecularTransmissionLobe

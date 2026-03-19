@@ -25,7 +25,7 @@
 #define OPENPBR_DIRAC_DELTA_PDF (-1.0f)
 
 // Sample a sphere uniformly and return a unit vector
-INLINE_FUNCTION vec3 openpbr_sample_unit_sphere_uniform(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_unit_sphere_uniform(const vec2 s)
 {
     const float phi = OpenPBR_TwoPi * s[0];
     const float z = 2.0f * s[1] - 1.0f;              // cos(theta)
@@ -34,7 +34,7 @@ INLINE_FUNCTION vec3 openpbr_sample_unit_sphere_uniform(const vec2 s)
 }
 
 // Sample the upper z hemisphere uniformly and return a unit vector
-INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_uniform(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_uniform(const vec2 s)
 {
     const float phi = OpenPBR_TwoPi * s[0];
     const float z = s[1];                            // cos(theta)
@@ -43,7 +43,7 @@ INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_uniform(const vec2 s)
 }
 
 // Sample the upper z hemisphere with a cosine distribution
-INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_cosine(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_cosine(const vec2 s)
 {
     const float phi = OpenPBR_TwoPi * s[0];
     const float z = sqrt(s[1]);         // cos(theta)
@@ -52,13 +52,13 @@ INLINE_FUNCTION vec3 openpbr_sample_unit_hemisphere_cosine(const vec2 s)
 }
 
 // Returns the PDF corresponding to the cosine-weighted hemisphere sampling function above.
-INLINE_FUNCTION float openpbr_compute_pdf_for_sample_unit_hemisphere_cosine(const vec3 direction_lsn)
+OPENPBR_INLINE_FUNCTION float openpbr_compute_pdf_for_sample_unit_hemisphere_cosine(const vec3 direction_lsn)
 {
     return max(0.0f, openpbr_get_cos_theta_ls(direction_lsn) * OpenPBR_RcpPi);
 }
 
 // Sample a triangle uniformly using Heitz's low-distortion map between triangle and square. (paper V2 optimized version)
-INLINE_FUNCTION vec3 openpbr_sample_unit_triangle_uniform(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_unit_triangle_uniform(const vec2 s)
 {
     vec3 v;
     if (s.y > s.x)
@@ -76,7 +76,7 @@ INLINE_FUNCTION vec3 openpbr_sample_unit_triangle_uniform(const vec2 s)
 }
 
 // Sample a unit disk uniformly and return a unit 2D vector
-INLINE_FUNCTION vec2 openpbr_sample_unit_disk_uniform(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec2 openpbr_sample_unit_disk_uniform(const vec2 s)
 {
     const float a = 2.0f * s.x - 1.0f;
     const float b = 2.0f * s.y - 1.0f;
@@ -102,13 +102,13 @@ INLINE_FUNCTION vec2 openpbr_sample_unit_disk_uniform(const vec2 s)
 }
 
 // Sample a unit square centered at 0 from [-.5,.5]
-INLINE_FUNCTION vec2 openpbr_sample_unit_rectangle_uniform(const vec2 s)
+OPENPBR_INLINE_FUNCTION vec2 openpbr_sample_unit_rectangle_uniform(const vec2 s)
 {
     return vec2(s[0] - 0.5f, s[1] - 0.5f);
 }
 
 // Sample a cone with angle theta oriented toward (0, 0, 1).
-INLINE_FUNCTION vec3 openpbr_sample_cone_uniform(const vec2 u, const float cos_theta_max)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_cone_uniform(const vec2 u, const float cos_theta_max)
 {
     const float cos_theta = (1.0f - u.x) + u.x * cos_theta_max;
     const float sin_theta = sqrt(1.0f - openpbr_square(cos_theta));
@@ -117,7 +117,7 @@ INLINE_FUNCTION vec3 openpbr_sample_cone_uniform(const vec2 u, const float cos_t
     return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
-INLINE_FUNCTION float openpbr_compute_pdf_for_sample_cone_uniform(const float cos_theta_max)
+OPENPBR_INLINE_FUNCTION float openpbr_compute_pdf_for_sample_cone_uniform(const float cos_theta_max)
 {
     return 1.0f / (2.0f * OpenPBR_Pi * (1.0f - cos_theta_max));
 }

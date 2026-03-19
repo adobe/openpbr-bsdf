@@ -17,14 +17,18 @@
 #ifndef OPENPBR_BSDF_LOBE_TYPE_H
 #define OPENPBR_BSDF_LOBE_TYPE_H
 
-#define OpenPBR_BsdfLobeType uint
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeNone = 0;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeReflection = 1 << 0;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeTransmission = 1 << 1;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeDiffuse = 1 << 2;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeGlossy = 1 << 3;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeSpecular = 1 << 4;
-CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeVolume = 1 << 5;
+#ifndef OPENPBR_UINT32
+#error "OPENPBR_UINT32 must be defined by the interop layer before including openpbr_bsdf_lobe_type.h."
+#endif
+
+#define OpenPBR_BsdfLobeType OPENPBR_UINT32
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeNone = 0;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeReflection = 1 << 0;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeTransmission = 1 << 1;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeDiffuse = 1 << 2;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeGlossy = 1 << 3;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeSpecular = 1 << 4;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeVolume = 1 << 5;
 
 // Swap reflection and transmission in the OpenPBR_BsdfLobeType bitmask.
 OpenPBR_BsdfLobeType openpbr_swap_reflect_trans_flags(OpenPBR_BsdfLobeType bsdf_lobe_type)

@@ -32,57 +32,61 @@ struct OpenPBR_IorReflectionCoefficient
     float eta_t_over_eta_i;  // the IOR used for reflection
 };
 
-vec3 openpbr_reflection_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff, const float idoth)
+vec3 openpbr_reflection_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+                                    const float idoth)
 {
     return vec3(openpbr_fresnel(refl_trans_coeff.eta_t_over_eta_i, idoth));
 }
 
-vec3 openpbr_transmission_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff, const float idoth)
+vec3 openpbr_transmission_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+                                      const float idoth)
 {
     return vec3(0.0f);
 }
 
 // The default implementations of the reflection and transmission probabilities use both coefficients.
 // Specialized implementations could calculate both based on the same shared factors (such as fresnel and 1-fresnel).
-OpenPBR_AllCoefficients openpbr_all_coefficients(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff, const float idoth)
+OpenPBR_AllCoefficients openpbr_all_coefficients(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+                                                 const float idoth)
 {
-    return MAKE_STRUCT_2(OpenPBR_AllCoefficients, openpbr_reflection_coefficient(refl_trans_coeff, idoth), vec3(0.0f));
+    return OPENPBR_MAKE_STRUCT_2(OpenPBR_AllCoefficients, openpbr_reflection_coefficient(refl_trans_coeff, idoth), vec3(0.0f));
 }
 
-float openpbr_reflection_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+float openpbr_reflection_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
                                      const vec3 path_throughput,
                                      const float idoth)
 {
     return 1.0f;
 }
 
-float openpbr_transmission_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+float openpbr_transmission_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
                                        const vec3 path_throughput,
                                        const float idoth)
 {
     return 0.0f;
 }
 
-OpenPBR_AllCoefficientsAndProbabilities openpbr_all_coefficients_and_probabilities(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient)
-                                                                                       refl_trans_coeff,
-                                                                                   const vec3 path_throughput,
-                                                                                   const float idoth)
+OpenPBR_AllCoefficientsAndProbabilities
+openpbr_all_coefficients_and_probabilities(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+                                           const vec3 path_throughput,
+                                           const float idoth)
 {
-    return MAKE_STRUCT_4(OpenPBR_AllCoefficientsAndProbabilities, openpbr_reflection_coefficient(refl_trans_coeff, idoth), vec3(0.0f), 1.0f, 0.0f);
+    return OPENPBR_MAKE_STRUCT_4(
+        OpenPBR_AllCoefficientsAndProbabilities, openpbr_reflection_coefficient(refl_trans_coeff, idoth), vec3(0.0f), 1.0f, 0.0f);
 }
 
-float openpbr_estimate_weight(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+float openpbr_estimate_weight(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
                               const vec3 path_throughput,
                               const float idotn)
 {
     return openpbr_max_component_of_throughput_weighted_color(path_throughput, openpbr_reflection_coefficient(refl_trans_coeff, idotn));
 }
 
-float openpbr_estimate_weight_when_applied_to_ggx_microfacet_distribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_IorReflectionCoefficient)
-                                                                              refl_trans_coeff,
-                                                                          const vec3 path_throughput,
-                                                                          const float idotn,
-                                                                          const float isotropic_alpha)
+float openpbr_estimate_weight_when_applied_to_ggx_microfacet_distribution(
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IorReflectionCoefficient) refl_trans_coeff,
+    const vec3 path_throughput,
+    const float idotn,
+    const float isotropic_alpha)
 {
     // In this case we are given the alpha of the GGX microfacet distribution being used with our dielectric Fresnel reflection coefficient,
     // so we can look up the energy reflected (the complement of the energy not reflected) directly.

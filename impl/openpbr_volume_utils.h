@@ -27,9 +27,9 @@
 
 // Clamping inputs is necessary to handle edge cases that would result in overflow and NaNs,
 // and to avoid extreme values that would result in numerical issues during path tracing.
-CONSTEXPR_GLOBAL float OpenPBR_MinColor = 1e-3f;
-CONSTEXPR_GLOBAL float OpenPBR_MinDistance = 1e-3f;
-CONSTEXPR_GLOBAL float OpenPBR_MaxAbsAnisotropy = 0.999f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MinColor = 1e-3f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MinDistance = 1e-3f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MaxAbsAnisotropy = 0.999f;
 
 vec3 openpbr_clamp_input_color(const vec3 color)
 {
@@ -107,7 +107,7 @@ OpenPBR_HomogeneousVolume openpbr_create_volume_from_openpbr_params(const vec3 t
                                                                     const vec3 transmission_scatter,
                                                                     const float transmission_anisotropy)
 {
-    ASSERT(transmission_depth > 0.0f, "Zero-depth transmission should have been handled outside this function");
+    OPENPBR_ASSERT(transmission_depth > 0.0f, "Zero-depth transmission should have been handled outside this function");
 
     // Early-out if extinction would be zero or invalid.
     if (openpbr_min3(transmission_color) >= 1.0f && openpbr_max3(transmission_scatter) <= 0.0f)

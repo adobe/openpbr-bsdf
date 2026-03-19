@@ -26,11 +26,11 @@
 
 // This function ensures that a random number is in [0, 1),
 // which may occasionally not be the case due to rounding error or fast-math transformations in remapping calculations.
-void openpbr_clamp_remapped_random_number(ADDRESS_SPACE_THREAD INOUT(float) rand)
+void openpbr_clamp_remapped_random_number(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(float) rand)
 {
-    ASSERT(rand >= 0.0f, "It is assumed that the random number is already >= 0");
+    OPENPBR_ASSERT(rand >= 0.0f, "It is assumed that the random number is already >= 0");
     // TODO: Address numerical vulnerabilities, uncomment this assertion, and disable the following clamp.
-    // ASSERT(rand < 1.0f, "It is assumed that the random number is already < 1");
+    // OPENPBR_ASSERT(rand < 1.0f, "It is assumed that the random number is already < 1");
     rand = min(rand, OpenPBR_LargestFloatBelowOne);
 }
 
@@ -200,13 +200,13 @@ float openpbr_eval_aniso_smith_g2(const vec3 v1, const vec3 v2, const vec2 alpha
 // Used for estimating the average contribution of a BSDF lobe, which is used for lobe selection.
 float openpbr_max_component_of_throughput_weighted_color(const vec3 path_throughput, const vec3 x)
 {
-    ASSERT(all(greaterThanEqual(path_throughput, vec3(0.0f))), "Throughput is expected to be non-negative");
+    OPENPBR_ASSERT(all(greaterThanEqual(path_throughput, vec3(0.0f))), "Throughput is expected to be non-negative");
     const vec3 throughput_weighted_color = path_throughput * x;
     return openpbr_max3(throughput_weighted_color);
 }
 
 // Converts IOR to F0.
-GENERAL_CONSTEXPR_FUNCTION float openpbr_f0_from_ior(const float eta_t_over_eta_i)
+OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_f0_from_ior(const float eta_t_over_eta_i)
 {
     return openpbr_square((eta_t_over_eta_i - 1.0f) / (eta_t_over_eta_i + 1.0f));
 }
@@ -214,19 +214,19 @@ GENERAL_CONSTEXPR_FUNCTION float openpbr_f0_from_ior(const float eta_t_over_eta_
 // Converts F0 to IOR.
 float openpbr_ior_from_f0(const float f0)
 {
-    ASSERT(f0 < 1.0f, "Can only compute valid finite IOR for incident reflectivity less than one.");
+    OPENPBR_ASSERT(f0 < 1.0f, "Can only compute valid finite IOR for incident reflectivity less than one.");
     const float sqrt_f0 = openpbr_fast_sqrt(f0);
     const float eta_t_over_eta_i = (1.0f + sqrt_f0) / (1.0f - sqrt_f0);  // infinity if f0 is 1
     return eta_t_over_eta_i;
 }
 
-// Adjusts the given IOR using the ASM "specular level" param.
+// Adjusts the given IOR using the ASM-style "specular level" param.
 // When the "specular level" is 0.5, this function is a no-op.
 float openpbr_apply_specular_level_to_ior(const float eta_t_over_eta_i, const float specular_level)
 {
     const float unscaled_f0 = openpbr_f0_from_ior(eta_t_over_eta_i);
     const float scaled_f0 = unscaled_f0 * specular_level * 2.0f;
-    CONSTEXPR_LOCAL float MaxF0 = 0.9999f;
+    OPENPBR_CONSTEXPR_LOCAL float MaxF0 = 0.9999f;
     const float clamped_scaled_f0 = min(scaled_f0, MaxF0);
     const float external_ior = openpbr_ior_from_f0(clamped_scaled_f0);
     const bool internal_reflection = eta_t_over_eta_i < 1.0f;
@@ -239,7 +239,7 @@ float openpbr_apply_specular_weight_to_ior(const float eta_t_over_eta_i, const f
 {
     const float unscaled_f0 = openpbr_f0_from_ior(eta_t_over_eta_i);
     const float scaled_f0 = unscaled_f0 * specular_weight;
-    CONSTEXPR_LOCAL float MaxF0 = 0.9999f;
+    OPENPBR_CONSTEXPR_LOCAL float MaxF0 = 0.9999f;
     const float clamped_scaled_f0 = min(scaled_f0, MaxF0);
     const float external_ior = openpbr_ior_from_f0(clamped_scaled_f0);
     const bool internal_reflection = eta_t_over_eta_i < 1.0f;
@@ -282,7 +282,7 @@ float openpbr_schlick_with_tir(const float eta_t_over_eta_i, const float cos_the
 // Calculates real unpolarized Fresnel reflectivity.
 float openpbr_fresnel(const float eta_t_over_eta_i, const float cos_theta_i)
 {
-    ASSERT(cos_theta_i >= 0.0f, "Fresnel input cosine must be non-negative");
+    OPENPBR_ASSERT(cos_theta_i >= 0.0f, "Fresnel input cosine must be non-negative");
     if (eta_t_over_eta_i == 1.0f)
         return 0.0f;  // indexed-matched media
     const float sin_theta_i_squared = 1.0f - openpbr_square(cos_theta_i);
@@ -298,7 +298,7 @@ float openpbr_fresnel(const float eta_t_over_eta_i, const float cos_theta_i)
 }
 
 // This is an RGB version of the Fresnel function.
-// The ASM/OpenPBR specialization constant for ENABLE_DISPERSION should be passed into enable_dispersion.
+// The OpenPBR specialization constant for ENABLE_DISPERSION should be passed into enable_dispersion.
 vec3 openpbr_fresnel_rgb(const vec3 eta_t_over_eta_i, const float cos_theta_i, const bool enable_dispersion)
 {
     if (enable_dispersion)
@@ -342,23 +342,23 @@ float openpbr_thin_wall_fresnel(const float eta_t_over_eta_i, const float cos_th
 
 vec3 openpbr_compute_metal_schlick_b_factor(const vec3 f0, const vec3 f82_tint)
 {
-    CONSTEXPR_LOCAL float CosThetaMax = 1.0f / 7.0f;
-    CONSTEXPR_LOCAL float OneMinusCosThetaMax = 1.0f - CosThetaMax;
-    CONSTEXPR_LOCAL float OneMinusCosThetaMaxToTheFifth = openpbr_fifth_power(OneMinusCosThetaMax);
-    CONSTEXPR_LOCAL float OneMinusCosThetaMaxToTheSixth = openpbr_sixth_power(OneMinusCosThetaMax);
+    OPENPBR_CONSTEXPR_LOCAL float CosThetaMax = 1.0f / 7.0f;
+    OPENPBR_CONSTEXPR_LOCAL float OneMinusCosThetaMax = 1.0f - CosThetaMax;
+    OPENPBR_CONSTEXPR_LOCAL float OneMinusCosThetaMaxToTheFifth = openpbr_fifth_power(OneMinusCosThetaMax);
+    OPENPBR_CONSTEXPR_LOCAL float OneMinusCosThetaMaxToTheSixth = openpbr_sixth_power(OneMinusCosThetaMax);
     const vec3 r = f0;        // switch to terminology from the "Fresnel Equations Considered Harmful" slides
     const vec3 t = f82_tint;  // custom terminology: "t" (for "tint") = h / (r + (1 - r) * (1 - CosThetaMax)^5)
     const vec3 white_minus_r = vec3(1.0f) - r;
     const vec3 white_minus_t = vec3(1.0f) - t;
     const vec3 b_numerator = (r + white_minus_r * OneMinusCosThetaMaxToTheFifth) * white_minus_t;
-    CONSTEXPR_LOCAL float BDenominator = CosThetaMax * OneMinusCosThetaMaxToTheSixth;
-    CONSTEXPR_LOCAL float BDenominatorReciprocal = 1.0f / BDenominator;
+    OPENPBR_CONSTEXPR_LOCAL float BDenominator = CosThetaMax * OneMinusCosThetaMaxToTheSixth;
+    OPENPBR_CONSTEXPR_LOCAL float BDenominatorReciprocal = 1.0f / BDenominator;
     return b_numerator * BDenominatorReciprocal;  // analogous to "a" in the "Fresnel Equations Considered Harmful" slides
 }
 
 vec3 openpbr_metal_schlick_with_f82_tint(const vec3 f0, const vec3 f82_tint, const float cos_theta)
 {
-    ASSERT(cos_theta >= 0.0f, "F82-tint input cosine must be non-negative");
+    OPENPBR_ASSERT(cos_theta >= 0.0f, "F82-tint input cosine must be non-negative");
     const vec3 r = f0;  // switch to terminology from the "Fresnel Equations Considered Harmful" slides
     const vec3 white_minus_r = vec3(1.0f) - r;
     const vec3 b = openpbr_compute_metal_schlick_b_factor(f0, f82_tint);
@@ -379,7 +379,11 @@ vec3 openpbr_metal_average_fresnel_with_f82_tint(const vec3 f0, const vec3 f82_t
 }
 
 // Calculates refracted direction.
-bool openpbr_refract(const vec3 wi, const vec3 n, const float cos_theta_i, const float eta_t_over_eta_i, ADDRESS_SPACE_THREAD OUT(vec3) wt)
+bool openpbr_refract(const vec3 wi,
+                     const vec3 n,
+                     const float cos_theta_i,
+                     const float eta_t_over_eta_i,
+                     OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) wt)
 {
     const float eta_i_over_eta_t = 1.0f / eta_t_over_eta_i;
 
@@ -406,7 +410,7 @@ bool openpbr_refract(const vec3 wi, const vec3 n, const float cos_theta_i, const
 // average energy complement that has been decoded from low-precision fixed-point form.
 float openpbr_clamp_average_energy_complement_above_zero(const float average_energy_complement)
 {
-    CONSTEXPR_LOCAL float min_value = 1e-12f;
+    OPENPBR_CONSTEXPR_LOCAL float min_value = 1e-12f;
     return max(average_energy_complement, min_value);
 }
 
@@ -416,10 +420,10 @@ float openpbr_combine_coat_and_base_pdfs(const float pdf_coat, const float pdf_b
 }
 
 // Clears the output parameters of a lobe sampling function when sampling fails.
-void openpbr_clear_lobe_sampling_output(ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                                        ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                                        ADDRESS_SPACE_THREAD OUT(float) pdf,
-                                        ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+void openpbr_clear_lobe_sampling_output(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     light_direction = vec3(0.0f);
     weight = openpbr_make_zero_diffuse_specular();

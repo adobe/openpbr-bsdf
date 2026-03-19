@@ -33,7 +33,7 @@ struct OpenPBR_ThinWallDiffuseTransmissionLobe
 };
 
 // Initialize the inner diffuse lobe with flipped normal and reflected view direction.
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_ThinWallDiffuseTransmissionLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_ThinWallDiffuseTransmissionLobe) lobe,
                              const vec3 normal_ff,
                              const vec3 view_direction,
                              const vec3 diffuse_albedo,
@@ -47,7 +47,7 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_ThinWallDiffuseT
     const float dot_reflected_flipped = dot(reflected_view, flipped_normal);
     if (dot_reflected_flipped < 0.0f)
     {
-        ASSERT(dot_reflected_flipped > -1e-5f, "Reflected view is significantly misaligned with flipped normal");
+        OPENPBR_ASSERT(dot_reflected_flipped > -1e-5f, "Reflected view is significantly misaligned with flipped normal");
 
         // In the rare case where the reflected view is on the wrong side of the surface, we force it to be above the surface.
         // This can happen due to numerical precision issues when the view direction is nearly parallel to the surface
