@@ -18,9 +18,10 @@
 #define OPENPBR_SPECIALIZATION_CONSTANTS_H
 
 // Specialization constant 0, 1 are reserved for scene-related information
-DECLARE_SPECIALIZATION_CONSTANT(2, EnableSheenAndCoat, true);
-DECLARE_SPECIALIZATION_CONSTANT(3, EnableDispersion, true);
-DECLARE_SPECIALIZATION_CONSTANT(4, EnableTranslucency, true);
-DECLARE_SPECIALIZATION_CONSTANT(5, EnableMetallic, true);
+// TODO: Decouple the OpenPBR BSDF specialization constants from the scene ones.
+OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(2, EnableSheenAndCoat, true);
+OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(3, EnableDispersion, true);
+OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(4, EnableTranslucency, true);
+OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(5, EnableMetallic, true);
 
 #endif  // !OPENPBR_SPECIALIZATION_CONSTANTS_H

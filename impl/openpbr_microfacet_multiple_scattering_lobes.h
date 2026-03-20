@@ -21,8 +21,9 @@
 #include "openpbr_lobe_utils.h"
 #include "openpbr_microfacet_multiple_scattering_data.h"
 
-CONSTEXPR_GLOBAL float OpenPBR_MinRoughnessWithVisibleEnergyLoss = 0.04f;  // empirically derived
-CONSTEXPR_GLOBAL float OpenPBR_MinAlphaWithVisibleEnergyLoss = OpenPBR_MinRoughnessWithVisibleEnergyLoss * OpenPBR_MinRoughnessWithVisibleEnergyLoss;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MinRoughnessWithVisibleEnergyLoss = 0.04f;  // empirically derived
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MinAlphaWithVisibleEnergyLoss =
+    OpenPBR_MinRoughnessWithVisibleEnergyLoss * OpenPBR_MinRoughnessWithVisibleEnergyLoss;
 
 ////////////////////////////////////////////////
 // DielectricMicrofacetMultipleScatteringLobe //
@@ -39,7 +40,8 @@ struct OpenPBR_DielectricMicrofacetMultipleScatteringLobe
     float energy_complement_ti_idotn;
 };
 
-float openpbr_clamped_tabulated_factors(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe, float odotn)
+float openpbr_clamped_tabulated_factors(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+                                        float odotn)
 {
     float ior_to_use;
     if (odotn > 0.0f)
@@ -61,8 +63,9 @@ float openpbr_clamped_tabulated_factors(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_D
     return min(tabulated_factors, openpbr_safe_divide(1.0f, odotn, 0.0f));
 }
 
-float openpbr_clamped_tabulated_factors_including_ratio(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
-                                                        float odotn)
+float openpbr_clamped_tabulated_factors_including_ratio(
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+    float odotn)
 {
     float ior_to_use;
     float ratio_to_use;
@@ -88,7 +91,7 @@ float openpbr_clamped_tabulated_factors_including_ratio(ADDRESS_SPACE_THREAD CON
     return min(tabulated_factors, openpbr_safe_divide(1.0f, odotn, 0.0f));
 }
 
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
                              const vec3 normal_ff,
                              const vec3 view_direction,
                              const float alpha,
@@ -112,14 +115,15 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_DielectricMicrof
     lobe.energy_complement_ti_idotn = openpbr_look_up_ideal_dielectric_energy_complement(lobe.eta_t_over_eta_i, lobe.alpha, idotn);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe)
 {
     return OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection | OpenPBR_BsdfLobeTypeTransmission;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
-                                                     const vec3 view_direction,
-                                                     const vec3 light_direction)
+OpenPBR_DiffuseSpecular
+openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+                             const vec3 view_direction,
+                             const vec3 light_direction)
 {
     if (lobe.alpha < OpenPBR_MinAlphaWithVisibleEnergyLoss)
         return openpbr_make_zero_diffuse_specular();
@@ -137,7 +141,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     }
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -155,13 +159,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Dielectr
     }
 }
 
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     if (lobe.alpha < OpenPBR_MinAlphaWithVisibleEnergyLoss)
     {
@@ -211,7 +215,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrof
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DielectricMicrofacetMultipleScatteringLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {
@@ -234,7 +238,8 @@ struct OpenPBR_MetalMicrofacetMultipleScatteringLobe
     float energy_complement_idotn;
 };
 
-float openpbr_clamped_tabulated_factors(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe, const float odotn)
+float openpbr_clamped_tabulated_factors(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+                                        const float odotn)
 {
     const float tabulated_factors =
         lobe.energy_complement_idotn * openpbr_look_up_ideal_metal_energy_complement(lobe.alpha, odotn) /
@@ -243,7 +248,7 @@ float openpbr_clamped_tabulated_factors(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_M
     return min(tabulated_factors, openpbr_safe_divide(1.0f, odotn, 0.0f));
 }
 
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
                              const vec3 normal_ff,
                              const vec3 view_direction,
                              const float alpha,
@@ -262,12 +267,13 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_MetalMicrofacetM
     lobe.energy_complement_idotn = openpbr_look_up_ideal_metal_energy_complement(lobe.alpha, idotn);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe)
 {
     return OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe)
+                                                         lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -287,7 +293,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     }
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -305,13 +311,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMic
     }
 }
 
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     if (lobe.alpha < OpenPBR_MinAlphaWithVisibleEnergyLoss)
     {
@@ -337,7 +343,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetM
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_MetalMicrofacetMultipleScatteringLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

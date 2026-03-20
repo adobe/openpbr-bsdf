@@ -17,8 +17,8 @@
 #ifndef OPENPBR_RESOLVED_INPUTS_H
 #define OPENPBR_RESOLVED_INPUTS_H
 
-#include "openpbr_basis.h"
 #include "impl/openpbr_math.h"
+#include "openpbr_basis.h"
 
 // Fully-resolved, texture-free OpenPBR inputs matching the official
 // OpenPBR parameter set with a few modifications (noted in comments).
@@ -154,7 +154,7 @@ OpenPBR_ResolvedInputs openpbr_make_default_resolved_inputs()
     inputs.geometry_thin_walled = false;
 
     // Bases
-    inputs.shading_basis = MAKE_STRUCT_3(OpenPBR_Basis, vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
+    inputs.shading_basis = OPENPBR_MAKE_STRUCT_3(OpenPBR_Basis, vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
     inputs.coat_basis = inputs.shading_basis;
 
     return inputs;

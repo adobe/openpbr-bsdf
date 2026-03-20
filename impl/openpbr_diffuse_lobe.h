@@ -40,8 +40,8 @@ struct OpenPBR_EnergyConservingRoughDiffuseLobe
 // Low-level BRDF implementation.
 // -------------------------------
 
-CONSTEXPR_GLOBAL float OpenPBR_FONConstantA = 0.5f - 2.0f / (3.0f * OpenPBR_Pi);
-CONSTEXPR_GLOBAL float OpenPBR_FONConstantB = 2.0f / 3.0f - 28.0f / (15.0f * OpenPBR_Pi);
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FONConstantA = 0.5f - 2.0f / (3.0f * OpenPBR_Pi);
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FONConstantB = 2.0f / 3.0f - 28.0f / (15.0f * OpenPBR_Pi);
 
 // Fujii Oren-Nayar (FON) directional albedo (exact).
 float openpbr_E_FON_exact(const float mu, const float roughness)
@@ -57,10 +57,10 @@ float openpbr_E_FON_exact(const float mu, const float roughness)
 float openpbr_E_FON_approx(const float mu, const float roughness)
 {
     const float mucomp = 1.0f - mu;
-    CONSTEXPR_LOCAL float g1 = 0.0571085289f;
-    CONSTEXPR_LOCAL float g2 = 0.491881867f;
-    CONSTEXPR_LOCAL float g3 = -0.332181442f;
-    CONSTEXPR_LOCAL float g4 = 0.0714429953f;
+    OPENPBR_CONSTEXPR_LOCAL float g1 = 0.0571085289f;
+    OPENPBR_CONSTEXPR_LOCAL float g2 = 0.491881867f;
+    OPENPBR_CONSTEXPR_LOCAL float g3 = -0.332181442f;
+    OPENPBR_CONSTEXPR_LOCAL float g4 = 0.0714429953f;
     const float GoverPi = mucomp * (g1 + mucomp * (g2 + mucomp * (g3 + mucomp * g4)));
     return (1.0f + roughness * GoverPi) / (1.0f + OpenPBR_FONConstantA * roughness);
 }
@@ -85,7 +85,7 @@ vec3 openpbr_f_EON(const vec3 rho, const float roughness, const vec3 wi_local, c
                           openpbr_E_FON_approx(mu_i, roughness);                  // FON w_i albedo (approx)
     const float avgEF = AF * (1.0f + OpenPBR_FONConstantB * roughness);           // avg. albedo
     const vec3 rho_ms = (rho * rho) * avgEF / (vec3(1.0f) - rho * (1.0f - avgEF));
-    CONSTEXPR_LOCAL float Eps = 1.0e-7f;
+    OPENPBR_CONSTEXPR_LOCAL float Eps = 1.0e-7f;
     const vec3 f_ms = (rho_ms * OpenPBR_RcpPi) * max(Eps, 1.0f - EFo)  // multi-scatter lobe
                       * max(Eps, 1.0f - EFi) / max(Eps, 1.0f - avgEF);
     return f_ss + f_ms;
@@ -97,7 +97,7 @@ vec3 openpbr_f_EON(const vec3 rho, const float roughness, const vec3 wi_local, c
 
 // This function calculates the diffuse BRDF value adjusted for the specular energy compensation.
 // It handles selection of the appropriate BRDF model and conversion of the view and light directions to local space.
-vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                                                       const vec3 view_direction,
                                                       const vec3 light_direction)
 {
@@ -106,7 +106,7 @@ vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(ADDRESS_SPACE_THREAD CONST
     const vec3 wi_local = openpbr_world_to_local(basis, view_direction);
     const vec3 wo_local = openpbr_world_to_local(basis, light_direction);
 
-    CONSTEXPR_LOCAL bool Exact = false;
+    OPENPBR_CONSTEXPR_LOCAL bool Exact = false;
     const vec3 brdf_value = openpbr_f_EON(lobe.diffuse_albedo, lobe.diffuse_roughness, wi_local, wo_local, Exact);
 
     const float cos_out = wo_local.z;
@@ -122,7 +122,7 @@ vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(ADDRESS_SPACE_THREAD CONST
 // Required lobe functions.
 // ------------------------
 
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                              const vec3 normal_ff,
                              const vec3 view_direction,
                              const vec3 diffuse_albedo,
@@ -137,7 +137,7 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_EnergyConserving
     lobe.specular_eta_t_over_eta_i = specular_eta_t_over_eta_i;
 
     const float cos_in = dot(view_direction, lobe.normal_ff);
-    ASSERT(cos_in >= 0.0f, "Input normal must be face-forwarded");
+    OPENPBR_ASSERT(cos_in >= 0.0f, "Input normal must be face-forwarded");
 
     // In the terminology of the original ASM ECD lobe, this calculates (1 - L) / (1 - T).
     // (1 - V) is multiplied in later. TODO: Check terminology.
@@ -150,12 +150,12 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_EnergyConserving
     lobe.cached_specular_energy_compensation = untinted;
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe)
 {
     return OpenPBR_BsdfLobeTypeDiffuse | OpenPBR_BsdfLobeTypeReflection;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -167,25 +167,25 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
                                                       cos_out);
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
     return max(dot(light_direction, lobe.normal_ff), 0.0f) * OpenPBR_RcpPi;
 }
 
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
-    const vec3 light_direction_local = openpbr_sample_unit_hemisphere_cosine(SWIZZLE(rand, xy));
+    const vec3 light_direction_local = openpbr_sample_unit_hemisphere_cosine(OPENPBR_SWIZZLE(rand, xy));
     const float cos_out = light_direction_local.z;
 
-    ASSERT(cos_out >= 0.0f, "Hemisphere sampling is expected to return direction with non-negative Z component");
+    OPENPBR_ASSERT(cos_out >= 0.0f, "Hemisphere sampling is expected to return direction with non-negative Z component");
     // Implementation conventions dictates that the sampling function must return false if the pdf is zero,
     // which could potentially happen in this case if there are any numerical issues in the cosine sampling.
     if (cos_out == 0.0f)
@@ -205,7 +205,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConserving
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

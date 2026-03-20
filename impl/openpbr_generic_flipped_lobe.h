@@ -36,14 +36,14 @@
 #include "openpbr_math.h"
 
 // Get lobe type: query inner lobe type, then swap flags.
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe)
 {
     const OpenPBR_BsdfLobeType inner_type = openpbr_get_lobe_type(lobe.flipped_lobe);
     return openpbr_swap_reflect_trans_flags(inner_type);
 }
 
 // Evaluate lobe value (BSDF*cosine): reflect view across original normal, then delegate to inner lobe.
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -52,7 +52,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
 }
 
 // Evaluate lobe-sampling PDF: same reflect-then-delegate.
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -61,13 +61,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_
 }
 
 // Sample lobe: reflect view, delegate, then swap reflection/transmission bits.
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     const vec3 reflected_view = reflect(view_direction, lobe.flipped_lobe.normal_ff);  // reflects view across surface (view points away from surface)
     if (!openpbr_sample_lobe(lobe.flipped_lobe, rand, reflected_view, light_direction, weight, pdf, sampled_type))
@@ -77,7 +77,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_
 }
 
 // Estimate lobe contribution: reflect view, delegate.
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_FLIPPED_WRAPPER_LOBE_TYPE) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

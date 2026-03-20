@@ -17,15 +17,17 @@
 #ifndef OPENPBR_VOLUME_HOMOGENEOUS_H
 #define OPENPBR_VOLUME_HOMOGENEOUS_H
 
-#include "openpbr_basis.h"
 #include "impl/openpbr_sampling.h"
+#include "openpbr_basis.h"
 
 // Use a hard-coded magic constant to represent the extinction coefficient of the ambient volume.
 // The ambient volume is whatever volume exists in the space outside the objects --
 // currently the ambient volume is an empty volume overlayed with heterogeneous volumes.
-CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeExtinctionCoefficient = -3.402823466e+38f;
-CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeAlbedo = 0.0f;      // can be arbitrary because unused; zero can be compressed without special handling
-CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeAnisotropy = 0.0f;  // can be arbitrary because unused; zero can be compressed without special handling
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeExtinctionCoefficient = -3.402823466e+38f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeAlbedo =
+    0.0f;  // can be arbitrary because unused; zero can be compressed without special handling
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_AmbientVolumeAnisotropy =
+    0.0f;  // can be arbitrary because unused; zero can be compressed without special handling
 
 // Struct storing the properties of a homogeneous volume.
 // Extinction and albedo are used instead of absorption and scattering
@@ -38,9 +40,8 @@ struct OpenPBR_HomogeneousVolume
 };
 
 // Initializes a volume from extinction, albedo, and anisotropy.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_coefficient_and_albedo_and_anisotropy(vec3 extinction_coefficient,
-                                                                                                                    vec3 albedo,
-                                                                                                                    float anisotropy)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume
+openpbr_make_volume_from_extinction_coefficient_and_albedo_and_anisotropy(vec3 extinction_coefficient, vec3 albedo, float anisotropy)
 {
     OpenPBR_HomogeneousVolume volume;
     volume.extinction_coefficient = extinction_coefficient;
@@ -50,26 +51,26 @@ INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_co
 }
 
 // Initializes a volume from extinction and albedo.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_coefficient_and_albedo(vec3 extinction_coefficient, vec3 albedo)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_coefficient_and_albedo(vec3 extinction_coefficient, vec3 albedo)
 {
     return openpbr_make_volume_from_extinction_coefficient_and_albedo_and_anisotropy(extinction_coefficient, albedo, 0.0f);
 }
 
 // Initializes an empty volume (vacuum).
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_empty_volume()
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_empty_volume()
 {
     return openpbr_make_volume_from_extinction_coefficient_and_albedo_and_anisotropy(vec3(0.0f), vec3(0.0f), 0.0f);
 }
 
 // Initializes a default ambient volume.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_ambient_volume()
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_ambient_volume()
 {
     return openpbr_make_volume_from_extinction_coefficient_and_albedo_and_anisotropy(
         vec3(OpenPBR_AmbientVolumeExtinctionCoefficient), vec3(OpenPBR_AmbientVolumeAlbedo), OpenPBR_AmbientVolumeAnisotropy);
 }
 
 // Initializes a volume from extinction, creating an ambient volume if necessary.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_coefficient(vec3 extinction_coefficient)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_coefficient(vec3 extinction_coefficient)
 {
     if (all(equal(extinction_coefficient, vec3(OpenPBR_AmbientVolumeExtinctionCoefficient))))
     {
@@ -82,9 +83,10 @@ INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_extinction_co
 }
 
 // Initializes a volume from an absorption coefficient and a scattering coefficient.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_and_scattering_coefficients_and_anisotropy(vec3 absorption_coefficient,
-                                                                                                                         vec3 scattering_coefficient,
-                                                                                                                         float anisotropy)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume
+openpbr_make_volume_from_absorption_and_scattering_coefficients_and_anisotropy(vec3 absorption_coefficient,
+                                                                               vec3 scattering_coefficient,
+                                                                               float anisotropy)
 {
     OpenPBR_HomogeneousVolume volume;
     volume.extinction_coefficient = absorption_coefficient + scattering_coefficient;
@@ -106,26 +108,26 @@ INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_an
 }
 
 // Initializes a volume from an absorption coefficient and a scattering coefficient.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_and_scattering_coefficients(vec3 absorption_coefficient,
-                                                                                                          vec3 scattering_coefficient)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_and_scattering_coefficients(vec3 absorption_coefficient,
+                                                                                                                  vec3 scattering_coefficient)
 {
     return openpbr_make_volume_from_absorption_and_scattering_coefficients_and_anisotropy(absorption_coefficient, scattering_coefficient, 0.0f);
 }
 
 // Initializes a purely absorbing volume from an absorption coefficient alone.
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_coefficient(vec3 absorption_coefficient)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_make_volume_from_absorption_coefficient(vec3 absorption_coefficient)
 {
     return openpbr_make_volume_from_extinction_coefficient_and_albedo(absorption_coefficient, vec3(0.0f));
 }
 
 // Checks if a volume is empty (vacuum).
-INLINE_FUNCTION bool openpbr_is_empty_volume(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION bool openpbr_is_empty_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume)
 {
     return all(equal(volume.extinction_coefficient, vec3(0.0f)));
 }
 
 // Checks if a volume is an ambient volume.
-INLINE_FUNCTION bool openpbr_is_ambient_volume(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION bool openpbr_is_ambient_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume)
 {
     return all(equal(volume.extinction_coefficient, vec3(OpenPBR_AmbientVolumeExtinctionCoefficient))) &&
            all(equal(volume.albedo, vec3(OpenPBR_AmbientVolumeAlbedo))) && volume.anisotropy == OpenPBR_AmbientVolumeAnisotropy;
@@ -133,47 +135,52 @@ INLINE_FUNCTION bool openpbr_is_ambient_volume(ADDRESS_SPACE_THREAD CONST_REF(Op
 
 // Special version of function above with alternative interface
 // for use when only the extinction coefficient is known.
-INLINE_FUNCTION bool openpbr_is_ambient_volume(const vec3 extinction_coefficient)
+OPENPBR_INLINE_FUNCTION bool openpbr_is_ambient_volume(const vec3 extinction_coefficient)
 {
     return all(equal(extinction_coefficient, vec3(OpenPBR_AmbientVolumeExtinctionCoefficient)));
 }
 
 // Checks if a volume is a non-empty non-ambient volume.
-INLINE_FUNCTION bool openpbr_is_homogeneous_volume(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION bool openpbr_is_homogeneous_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume)
 {
     return (!openpbr_is_empty_volume(volume)) && (!openpbr_is_ambient_volume(volume));
 }
 
 // Calculates absorption coefficient of volume based on extinction and albedo.
-INLINE_FUNCTION vec3 openpbr_calculate_absorption_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_absorption_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                          volume)
 {
     return volume.extinction_coefficient * (1.0f - volume.albedo);
 }
 
 // Calculates scattering coefficient of volume based on extinction and albedo.
-INLINE_FUNCTION vec3 openpbr_calculate_scattering_coefficient(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_scattering_coefficient(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                          volume)
 {
     return volume.extinction_coefficient * volume.albedo;
 }
 
 // Calculates negative optical depth for volume.
-INLINE_FUNCTION vec3 openpbr_calculate_negative_optical_depth(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume, const float distance)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_negative_optical_depth(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                          volume,
+                                                                      const float distance)
 {
     return volume.extinction_coefficient * -distance;
 }
 
 // Calculates volume transmittance at the given finite distance.
-INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_distance(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                 const float distance)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_distance(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                             volume,
+                                                                         const float distance)
 {
-    ASSERT(openpbr_is_homogeneous_volume(volume), "This function should only be called for valid homogeneous volumes");
+    OPENPBR_ASSERT(openpbr_is_homogeneous_volume(volume), "This function should only be called for valid homogeneous volumes");
 
     return exp(openpbr_calculate_negative_optical_depth(volume, distance));
 }
 
 // Special version of function above with alternative interface
 // for use when only the extinction coefficient is known.
-INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_distance(const vec3 extinction_coefficient, const float distance)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_distance(const vec3 extinction_coefficient, const float distance)
 {
     const OpenPBR_HomogeneousVolume volume = openpbr_make_volume_from_extinction_coefficient(extinction_coefficient);
 
@@ -187,14 +194,16 @@ INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_distance(const vec3 exti
 }
 
 // Calculates the transmittance at an infinite distance.
-INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_infinity(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_transmittance_at_infinity(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                             volume)
 {
     return vec3(equal(volume.extinction_coefficient, vec3(0.0f)));
 }
 
 // Calculates probabilities of sampling a distance based on each color channel.
-INLINE_FUNCTION vec3 openpbr_calculate_color_channel_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                 const vec3 throughput)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_color_channel_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                             volume,
+                                                                         const vec3 throughput)
 {
     const vec3 total_contribution = throughput * volume.albedo;
     const float total_contribution_sum = openpbr_sum(total_contribution);
@@ -220,16 +229,16 @@ INLINE_FUNCTION vec3 openpbr_calculate_color_channel_probability(ADDRESS_SPACE_T
 //
 // This function sets the distance argument if light interacted with the volume. If there is no
 // volume, the distance argument is left as is.
-INLINE_FUNCTION void openpbr_sample_event_distance(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                   const vec3 throughput,
-                                                   const float rand,
-                                                   ADDRESS_SPACE_THREAD INOUT(float) distance)
+OPENPBR_INLINE_FUNCTION void openpbr_sample_event_distance(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
+                                                           const vec3 throughput,
+                                                           const float rand,
+                                                           OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(float) distance)
 {
     // We could return for empty volumes, but not calling this function for empty volumes saves a random number.
-    ASSERT(openpbr_is_homogeneous_volume(volume), "This function should only be called for valid homogeneous volumes");
+    OPENPBR_ASSERT(openpbr_is_homogeneous_volume(volume), "This function should only be called for valid homogeneous volumes");
 
     // Make sure the random number is in [0, 1).
-    ASSERT(rand < 1.0f, "Random number should be less than 1");
+    OPENPBR_ASSERT(rand < 1.0f, "Random number should be less than 1");
 
     // Select a color channel.
     const vec3 color_channel_probability = openpbr_calculate_color_channel_probability(volume, throughput);
@@ -258,7 +267,7 @@ INLINE_FUNCTION void openpbr_sample_event_distance(ADDRESS_SPACE_THREAD CONST_RE
     }
 
     // Verify that a color channel was selected successfully.
-    ASSERT(sampled_color_channel > -1 && rand_distance < 1.0f, "Color channel was not selected successfully");
+    OPENPBR_ASSERT(sampled_color_channel > -1 && rand_distance < 1.0f, "Color channel was not selected successfully");
 
     // Make sure the extinction of the sampled color channel is greater than zero;
     // otherwise, the sampled distance is infinity and the distance argument is left as is.
@@ -272,19 +281,20 @@ INLINE_FUNCTION void openpbr_sample_event_distance(ADDRESS_SPACE_THREAD CONST_RE
 }
 
 // Calculate the weight to apply to a volume interaction that occurs before a surface interaction.
-INLINE_FUNCTION vec3 openpbr_calculate_weight_for_event_at_distance(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                    const vec3 throughput,
-                                                                    const float distance)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_weight_for_event_at_distance(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                                volume,
+                                                                            const vec3 throughput,
+                                                                            const float distance)
 {
     // We could return zero for empty volumes, but it doesn't make sense to call this function for empty volumes in the first place.
-    ASSERT(openpbr_is_homogeneous_volume(volume), "Volume interactions should not occur in empty volumes");
+    OPENPBR_ASSERT(openpbr_is_homogeneous_volume(volume), "Volume interactions should not occur in empty volumes");
 
     const vec3 color_channel_probability = openpbr_calculate_color_channel_probability(volume, throughput);
     const vec3 transmittance = openpbr_calculate_transmittance_at_distance(volume, distance);
 
     const vec3 color_channel_pdf = transmittance * volume.extinction_coefficient;        // color-channel pdf at event distance
     const float event_pdf = openpbr_sum(color_channel_probability * color_channel_pdf);  // overall pdf based on contributions of all color channels
-    ASSERT(event_pdf > 0.0f, "Event PDF should be positive");
+    OPENPBR_ASSERT(event_pdf > 0.0f, "Event PDF should be positive");
 
     // Note: 1.0f/event_pdf could overflow if event_pdf is subnormal.
     return transmittance * openpbr_calculate_scattering_coefficient(volume) *
@@ -294,9 +304,10 @@ INLINE_FUNCTION vec3 openpbr_calculate_weight_for_event_at_distance(ADDRESS_SPAC
 // Calculate the weight to apply to a surface interaction that occurs before a volume interaction.
 // Specifically, this incorporates the volume transmittance and the probability of the sampled
 // volume distance falling beyond the provided surface distance.
-INLINE_FUNCTION vec3 openpbr_calculate_weight_for_surface_at_distance(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                      const vec3 throughput,
-                                                                      const float distance)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_weight_for_surface_at_distance(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                                  volume,
+                                                                              const vec3 throughput,
+                                                                              const float distance)
 {
     // Special case for non-interaction with an empty volume.
     if (!openpbr_is_homogeneous_volume(volume))
@@ -309,7 +320,7 @@ INLINE_FUNCTION vec3 openpbr_calculate_weight_for_surface_at_distance(ADDRESS_SP
 
     const float surface_probability = openpbr_sum(
         color_channel_probability * transmittance);  // overall probability of reaching the surface based on contributions of all color channels
-    ASSERT(surface_probability > 0.0f, "Surface probability should be positive");
+    OPENPBR_ASSERT(surface_probability > 0.0f, "Surface probability should be positive");
 
     // Note: 1.0f/surface_probability could overflow if surface_probability is subnormal.
     return transmittance * (1.0f / surface_probability);  // equals one in the case of achromatic extinction
@@ -317,30 +328,31 @@ INLINE_FUNCTION vec3 openpbr_calculate_weight_for_surface_at_distance(ADDRESS_SP
 
 // Perfectly samples the isotropic phase function. The weight is implicitly one.
 // The albedo is not relevant because it was already included in the distance-sampling weight.
-INLINE_FUNCTION vec3 openpbr_sample_isotropic_phase_function(const vec2 rand)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_isotropic_phase_function(const vec2 rand)
 {
     return openpbr_sample_unit_sphere_uniform(rand);
 }
 
 // Returns the value of the isotropic phase function for any direction.
-INLINE_FUNCTION float openpbr_calculate_isotropic_phase_function_value()
+OPENPBR_INLINE_FUNCTION float openpbr_calculate_isotropic_phase_function_value()
 {
     return OpenPBR_RcpFourPi;
 }
 
 // Returns the probability density of sampling any direction from the isotropic phase function.
-INLINE_FUNCTION float openpbr_calculate_isotropic_phase_function_pdf()
+OPENPBR_INLINE_FUNCTION float openpbr_calculate_isotropic_phase_function_pdf()
 {
     return OpenPBR_RcpFourPi;
 }
 
 // Perfectly samples the anisotropic Henyey-Greenstein phase function. The weight is implicitly one.
 // The albedo is not relevant because it was already included in the distance-sampling weight.
-INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                               const vec3 view_direction_wsn,
-                                                               const vec2 rand)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                           volume,
+                                                                       const vec3 view_direction_wsn,
+                                                                       const vec2 rand)
 {
-    ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
+    OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
 
     // For details, see https://www.astro.umd.edu/~jph/HG_note.pdf
     const float g = volume.anisotropy;
@@ -355,11 +367,12 @@ INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(ADDRESS_SPACE_THR
 }
 
 // Returns the value of the anisotropic Henyey-Greenstein phase function for any direction.
-INLINE_FUNCTION float openpbr_calculate_anisotropic_phase_function_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                         const vec3 view_direction_wsn,
-                                                                         const vec3 light_direction_wsn)
+OPENPBR_INLINE_FUNCTION float
+openpbr_calculate_anisotropic_phase_function_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
+                                                   const vec3 view_direction_wsn,
+                                                   const vec3 light_direction_wsn)
 {
-    ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
+    OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
 
     // For details, see https://www.astro.umd.edu/~jph/HG_note.pdf
     const float g = volume.anisotropy;
@@ -368,20 +381,23 @@ INLINE_FUNCTION float openpbr_calculate_anisotropic_phase_function_value(ADDRESS
 }
 
 // Returns the probability density of sampling any direction from the anisotropic Henyey-Greenstein phase function.
-INLINE_FUNCTION float openpbr_calculate_anisotropic_phase_function_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                                       const vec3 view_direction_wsn,
-                                                                       const vec3 light_direction_wsn)
+OPENPBR_INLINE_FUNCTION float
+openpbr_calculate_anisotropic_phase_function_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
+                                                 const vec3 view_direction_wsn,
+                                                 const vec3 light_direction_wsn)
 {
     return openpbr_calculate_anisotropic_phase_function_value(volume, view_direction_wsn, light_direction_wsn);
 }
 
-INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_add_volumes(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume_A,
-                                                              ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume_B,
-                                                              const float volume_A_weight,
-                                                              const float volume_B_weight)
+OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_add_volumes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                          volume_A,
+                                                                      OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
+                                                                          volume_B,
+                                                                      const float volume_A_weight,
+                                                                      const float volume_B_weight)
 {
-    ASSERT(!openpbr_is_ambient_volume(volume_A), "Adding ambient volumes is not currently supported.");
-    ASSERT(!openpbr_is_ambient_volume(volume_B), "Adding ambient volumes is not currently supported.");
+    OPENPBR_ASSERT(!openpbr_is_ambient_volume(volume_A), "Adding ambient volumes is not currently supported.");
+    OPENPBR_ASSERT(!openpbr_is_ambient_volume(volume_B), "Adding ambient volumes is not currently supported.");
 
     const vec3 total_absorption_coefficient =
         openpbr_calculate_absorption_coefficient(volume_A) * volume_A_weight + openpbr_calculate_absorption_coefficient(volume_B) * volume_B_weight;
@@ -395,7 +411,8 @@ INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_add_volumes(ADDRESS_SPACE_THRE
 }
 
 // Returns the value of Eclair's "weighted roughness" heuristic for volumes.
-INLINE_FUNCTION float openpbr_calculate_weighted_roughness_for_volume(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_HomogeneousVolume) volume)
+OPENPBR_INLINE_FUNCTION float
+openpbr_calculate_weighted_roughness_for_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume)
 {
     // This is empirically derived.
     // TODO(sss): Revisit this.
@@ -412,12 +429,12 @@ INLINE_FUNCTION float openpbr_calculate_weighted_roughness_for_volume(ADDRESS_SP
 // interpolated normal. In the case of a low-poly mesh containing a dense volume, faceting artifacts that follow the geometric surface become visible.
 // What the weight in this function does is divide out the implicitly present cosine term that's based on the geometric normal and multiply in a
 // cosine term based on the interpolated normal, which results in the desired smooth appearance across the mesh.
-INLINE_FUNCTION float openpbr_volume_faceting_correction(const bool last_scattered_from_volume,
-                                                         const float side_light,
-                                                         const float side_view,
-                                                         const vec3 light_direction,
-                                                         const vec3 geometric_normal_normalized,
-                                                         const vec3 interpolated_normal_normalized)
+OPENPBR_INLINE_FUNCTION float openpbr_volume_faceting_correction(const bool last_scattered_from_volume,
+                                                                 const float side_light,
+                                                                 const float side_view,
+                                                                 const vec3 light_direction,
+                                                                 const vec3 geometric_normal_normalized,
+                                                                 const vec3 interpolated_normal_normalized)
 {
     if (last_scattered_from_volume && side_light > 0.0f && side_view < 0.0f)  // emerging from volume
     {

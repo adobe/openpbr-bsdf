@@ -19,14 +19,15 @@
 
 #include "openpbr_math.h"
 
-CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_C_nm = 656.3f;
-CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_D_nm = 589.3f;  // average of sodium lines D1 and D2
-CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_d_nm = 587.6f;  // helium line D3
-CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_F_nm = 486.1f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_C_nm = 656.3f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_D_nm = 589.3f;  // average of sodium lines D1 and D2
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_d_nm = 587.6f;  // helium line D3
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FraunhoferLine_F_nm = 486.1f;
 
-CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthLong_nm = OpenPBR_FraunhoferLine_C_nm;
-CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthMedium_nm = OpenPBR_FraunhoferLine_d_nm;  // Abbe originally used D, but today d is more common.
-CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthShort_nm = OpenPBR_FraunhoferLine_F_nm;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthLong_nm = OpenPBR_FraunhoferLine_C_nm;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthMedium_nm =
+    OpenPBR_FraunhoferLine_d_nm;  // Abbe originally used D, but today d is more common.
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthShort_nm = OpenPBR_FraunhoferLine_F_nm;
 
 // Converts OpenPBR "disperion" parameter to Abbe number V_d, the reciprocal of the relative mean dispersion:
 // V_d = (n_d - 1) / (n_F - n_C) (Abbe originally used D, but today d is more common). The mapping is
@@ -70,7 +71,7 @@ float openpbr_cauchy_equation(const float A, const float B, const float lambda_n
 // IOR 1 cannot produce dispersion and should also be handled separately by the caller.
 float openpbr_dispersion_adjusted_ior(const float original_ior, const float dispersion_param, const float wavelength_nm)
 {
-    ASSERT(dispersion_param > 0.0f && wavelength_nm > 0.0f, "This function assumes that there is non-zero dispersion");
+    OPENPBR_ASSERT(dispersion_param > 0.0f && wavelength_nm > 0.0f, "This function assumes that there is non-zero dispersion");
 
     const bool original_ior_was_less_than_one = original_ior < 1.0f;
     const float ior_above_one = original_ior_was_less_than_one ? 1.0f / original_ior : original_ior;

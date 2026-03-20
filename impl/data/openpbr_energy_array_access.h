@@ -17,9 +17,11 @@
 #ifndef OPENPBR_ENERGY_ARRAY_ACCESS_H
 #define OPENPBR_ENERGY_ARRAY_ACCESS_H
 
+#include "../../openpbr_settings.h"
+
 #if !OPENPBR_USE_TEXTURE_LUTS
 
-#include "openpbr_data_constants.h"
+#include "../../openpbr_data_constants.h"
 #include "openpbr_energy_arrays.h"
 
 // Energy table array access with ID-based selection
@@ -34,39 +36,38 @@
 // Note: Works with both uint and unsigned short storage types
 float openpbr_unorm_to_float(const OpenPBR_EnergyTableElement unorm_table_value)
 {
-    CONSTEXPR_LOCAL float UnormOne = 65535.0f;
-    CONSTEXPR_LOCAL float InverseUnormOne = 1.0f / UnormOne;
+    OPENPBR_CONSTEXPR_LOCAL float UnormOne = 65535.0f;
+    OPENPBR_CONSTEXPR_LOCAL float InverseUnormOne = 1.0f / UnormOne;
     return float(unorm_table_value) * InverseUnormOne;
 }
 
 // Fetch raw normalized value from energy table by ID and flat index
-OpenPBR_EnergyTableElement openpbr_fetch_lut_unorm(const OpenPBR_EnergyTableId lut_id, const int flat_index)
+OpenPBR_EnergyTableElement openpbr_fetch_lut_unorm(const OpenPBR_LutId lut_id, const int flat_index)
 {
     switch (lut_id)
     {
-        case OpenPBR_EnergyTableId_IdealDielectricEnergyComplement:
+        case OpenPBR_LutId_IdealDielectricEnergyComplement:
             return OpenPBR_IdealDielectricEnergyComplement_Array[flat_index];
-        case OpenPBR_EnergyTableId_IdealDielectricAverageEnergyComplement:
+        case OpenPBR_LutId_IdealDielectricAverageEnergyComplement:
             return OpenPBR_IdealDielectricAverageEnergyComplement_Array[flat_index];
-        case OpenPBR_EnergyTableId_IdealDielectricReflectionRatio:
+        case OpenPBR_LutId_IdealDielectricReflectionRatio:
             return OpenPBR_IdealDielectricReflectionRatio_Array[flat_index];
-        case OpenPBR_EnergyTableId_OpaqueDielectricEnergyComplement:
+        case OpenPBR_LutId_OpaqueDielectricEnergyComplement:
             return OpenPBR_OpaqueDielectricEnergyComplement_Array[flat_index];
-        case OpenPBR_EnergyTableId_OpaqueDielectricAverageEnergyComplement:
+        case OpenPBR_LutId_OpaqueDielectricAverageEnergyComplement:
             return OpenPBR_OpaqueDielectricAverageEnergyComplement_Array[flat_index];
-        case OpenPBR_EnergyTableId_IdealMetalEnergyComplement:
+        case OpenPBR_LutId_IdealMetalEnergyComplement:
             return OpenPBR_IdealMetalEnergyComplement_Array[flat_index];
-        case OpenPBR_EnergyTableId_IdealMetalAverageEnergyComplement:
+        case OpenPBR_LutId_IdealMetalAverageEnergyComplement:
             return OpenPBR_IdealMetalAverageEnergyComplement_Array[flat_index];
         default:
-            ASSERT_UNREACHABLE("Invalid energy table ID");
-            // Defensive fallback - should never get here
-            return 0;  // Should never happen
+            OPENPBR_ASSERT_UNREACHABLE("Invalid LUT ID");
+            return 0;
     }
 }
 
 // Fetch and decode energy table value to float [0.0, 1.0] in one step
-float openpbr_fetch_lut_float(const OpenPBR_EnergyTableId lut_id, const int flat_index)
+float openpbr_fetch_lut_float(const OpenPBR_LutId lut_id, const int flat_index)
 {
     return openpbr_unorm_to_float(openpbr_fetch_lut_unorm(lut_id, flat_index));
 }
@@ -74,22 +75,23 @@ float openpbr_fetch_lut_float(const OpenPBR_EnergyTableId lut_id, const int flat
 // Helper functions to compute flat index from 2D coordinates
 int openpbr_flatten_index_2d(const int ix, const int iy)
 {
-    CONSTEXPR_LOCAL int N = OpenPBR_EnergyTableSize;
+    OPENPBR_CONSTEXPR_LOCAL int N = OpenPBR_EnergyTableSize;
     return ix * N + iy;
 }
 
 // Helper functions to compute flat index from 3D coordinates
 int openpbr_flatten_index_3d(const int ix, const int iy, const int iz)
 {
-    CONSTEXPR_LOCAL int N = OpenPBR_EnergyTableSize;
-    CONSTEXPR_LOCAL int NN = N * N;
+    OPENPBR_CONSTEXPR_LOCAL int N = OpenPBR_EnergyTableSize;
+    OPENPBR_CONSTEXPR_LOCAL int NN = N * N;
     return ix * NN + iy * N + iz;
 }
 
 // Linear interpolation for 1D energy tables
-float openpbr_energy_array_lookup_linear(const OpenPBR_EnergyTableId lut_id, const float clamped_exact_index_x)
+float openpbr_energy_array_lookup_linear(const OpenPBR_LutId lut_id, const float clamped_exact_index_x)
 {
-    ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1), "Index must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index must be clamped to valid range");
 
     const int i0 = int(floor(clamped_exact_index_x));
     const int i1 = min(i0 + 1, OpenPBR_EnergyTableSize - 1);
@@ -102,10 +104,12 @@ float openpbr_energy_array_lookup_linear(const OpenPBR_EnergyTableId lut_id, con
 }
 
 // Bilinear interpolation for 2D energy tables
-float openpbr_energy_array_lookup_bilinear(const OpenPBR_EnergyTableId lut_id, const float clamped_exact_index_x, const float clamped_exact_index_y)
+float openpbr_energy_array_lookup_bilinear(const OpenPBR_LutId lut_id, const float clamped_exact_index_x, const float clamped_exact_index_y)
 {
-    ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1), "Index X must be clamped to valid range");
-    ASSERT(clamped_exact_index_y >= 0.0f && clamped_exact_index_y <= float(OpenPBR_EnergyTableSize - 1), "Index Y must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index X must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_y >= 0.0f && clamped_exact_index_y <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index Y must be clamped to valid range");
 
     const int ix0 = int(floor(clamped_exact_index_x));
     const int iy0 = int(floor(clamped_exact_index_y));
@@ -126,14 +130,17 @@ float openpbr_energy_array_lookup_bilinear(const OpenPBR_EnergyTableId lut_id, c
 }
 
 // Trilinear interpolation for 3D energy tables
-float openpbr_energy_array_lookup_trilinear(const OpenPBR_EnergyTableId lut_id,
+float openpbr_energy_array_lookup_trilinear(const OpenPBR_LutId lut_id,
                                             const float clamped_exact_index_x,
                                             const float clamped_exact_index_y,
                                             const float clamped_exact_index_z)
 {
-    ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1), "Index X must be clamped to valid range");
-    ASSERT(clamped_exact_index_y >= 0.0f && clamped_exact_index_y <= float(OpenPBR_EnergyTableSize - 1), "Index Y must be clamped to valid range");
-    ASSERT(clamped_exact_index_z >= 0.0f && clamped_exact_index_z <= float(OpenPBR_EnergyTableSize - 1), "Index Z must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_x >= 0.0f && clamped_exact_index_x <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index X must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_y >= 0.0f && clamped_exact_index_y <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index Y must be clamped to valid range");
+    OPENPBR_ASSERT(clamped_exact_index_z >= 0.0f && clamped_exact_index_z <= float(OpenPBR_EnergyTableSize - 1),
+                   "Index Z must be clamped to valid range");
 
     const int ix0 = int(floor(clamped_exact_index_x));
     const int iy0 = int(floor(clamped_exact_index_y));

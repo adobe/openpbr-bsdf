@@ -17,19 +17,19 @@
 #ifndef OPENPBR_CONSTANTS_H
 #define OPENPBR_CONSTANTS_H
 
-CONSTEXPR_GLOBAL float OpenPBR_FloatMin = 1.175494351e-38f;
-CONSTEXPR_GLOBAL float OpenPBR_LargestFloatBelowOne = 0.999999940f;  // 1 - 2^-24
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_FloatMin = 1.175494351e-38f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_LargestFloatBelowOne = 0.999999940f;  // 1 - 2^-24
 
-CONSTEXPR_GLOBAL float OpenPBR_Pi = 3.14159265f;
-CONSTEXPR_GLOBAL float OpenPBR_TwoPi = 6.28318531f;        // 2 * Pi
-CONSTEXPR_GLOBAL float OpenPBR_HalfPi = 1.57079633f;       // Pi / 2
-CONSTEXPR_GLOBAL float OpenPBR_PiOverFour = 0.785398163f;  // Pi / 4
-CONSTEXPR_GLOBAL float OpenPBR_RcpPi = 0.318309886f;       // 1 / Pi
-CONSTEXPR_GLOBAL float OpenPBR_RcpTwoPi = 0.159154943f;    // 1 / (2 * Pi) = 0.5 / Pi
-CONSTEXPR_GLOBAL float OpenPBR_RcpFourPi = 0.0795774715f;  // 1 / (4 * Pi) = 0.25 / Pi
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_Pi = 3.14159265f;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_TwoPi = 6.28318531f;        // 2 * Pi
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_HalfPi = 1.57079633f;       // Pi / 2
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_PiOverFour = 0.785398163f;  // Pi / 4
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_RcpPi = 0.318309886f;       // 1 / Pi
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_RcpTwoPi = 0.159154943f;    // 1 / (2 * Pi) = 0.5 / Pi
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_RcpFourPi = 0.0795774715f;  // 1 / (4 * Pi) = 0.25 / Pi
 
-CONSTEXPR_GLOBAL int OpenPBR_NumRgbChannels = 3;
-CONSTEXPR_GLOBAL float OpenPBR_VacuumIor = 1.0f;
-CONSTEXPR_GLOBAL vec3 OpenPBR_BaseRgbWavelengths_nm = vec3(620.0f, 540.0f, 450.0f);
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_NumRgbChannels = 3;
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_VacuumIor = 1.0f;
+OPENPBR_CONSTEXPR_GLOBAL vec3 OpenPBR_BaseRgbWavelengths_nm = vec3(620.0f, 540.0f, 450.0f);
 
 #endif

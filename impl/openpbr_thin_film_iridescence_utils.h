@@ -22,7 +22,7 @@
 #include "openpbr_math.h"
 
 // Iridescence-specific constants
-CONSTEXPR_GLOBAL float OpenPBR_MinDenomMag = 1e-9f;  // Minimum denominator magnitude to prevent division by zero
+OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_MinDenomMag = 1e-9f;  // Minimum denominator magnitude to prevent division by zero
 
 // Struct for polarized scalar quantities
 struct OpenPBR_PolarizedFloat
@@ -84,9 +84,9 @@ void openpbr_compute_fresnel_unified_polarized_amplitude(
     const float cos_theta_i,
     const float eta_i,
     const openpbr_complex eta_t,  // eta_t = n_t + i * k_t (complex IOR for conductors, or n_t + i*0 for dielectrics)
-    ADDRESS_SPACE_THREAD OUT(OpenPBR_PolarizedComplex) r,
-    ADDRESS_SPACE_THREAD OUT(OpenPBR_PolarizedComplex) t,
-    ADDRESS_SPACE_THREAD OUT(openpbr_complex) cos_theta_t)
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedComplex) r,
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedComplex) t,
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(openpbr_complex) cos_theta_t)
 {
     // Apply Snell's Law to compute complex cos(theta_t), which handles TIR by producing complex angles
     cos_theta_t = openpbr_snell_cos_unified(cos_theta_i, eta_i, eta_t);
@@ -126,10 +126,11 @@ void openpbr_compute_fresnel_unified_polarized_amplitude(
 void openpbr_compute_fresnel_dielectric_polarized_amplitude(const float cos_theta_i,
                                                             const float eta_i,
                                                             const float eta_t,
-                                                            ADDRESS_SPACE_THREAD OUT(OpenPBR_PolarizedFloat) r,  // Amplitude reflection coefficients
-                                                            ADDRESS_SPACE_THREAD OUT(OpenPBR_PolarizedFloat)
+                                                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedFloat)
+                                                                r,  // Amplitude reflection coefficients
+                                                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedFloat)
                                                                 t,  // Amplitude transmission coefficients
-                                                            ADDRESS_SPACE_THREAD OUT(float) cos_theta_t)
+                                                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) cos_theta_t)
 {
     const float sin_theta_i = sqrt(saturate(1.0f - cos_theta_i * cos_theta_i));
 
@@ -302,12 +303,7 @@ vec3 openpbr_compute_dielectric_reflectance(const OpenPBR_PolarizedFloat r12,
 
             // Unified complex Fresnel (dielectric base => eta_t is real, pass as complex(real, 0))
             openpbr_compute_fresnel_unified_polarized_amplitude(
-                cos_theta_t_film,
-                eta_film,
-                openpbr_complex(eta_base[color_channel], 0.0f),
-                r23[color_channel],
-                t23_unused,
-                cos_theta_t_base_unused);
+                cos_theta_t_film, eta_film, openpbr_complex(eta_base[color_channel], 0.0f), r23[color_channel], t23_unused, cos_theta_t_base_unused);
         }
         else
         {
@@ -388,12 +384,12 @@ openpbr_thin_film_and_base_reflectance(const float cos_theta_i,       // Cosine 
 
     // Ensure cos_theta_i is non-negative
     // Otherwise, this function should not have been called
-    ASSERT(cos_theta_i >= 0.0f, "cos_theta_i must be non-negative");
+    OPENPBR_ASSERT(cos_theta_i >= 0.0f, "cos_theta_i must be non-negative");
 
     // Ensure thin_film_thickness_nm is positive
     // Otherwise, there is no thin film to compute
     // The caller should have caught this by checking thin_film_presence_multiplier
-    ASSERT(thin_film_thickness_nm > 0.0f, "thin-film thickness must be positive");
+    OPENPBR_ASSERT(thin_film_thickness_nm > 0.0f, "thin-film thickness must be positive");
 
     // Default the results to zero in case some base components are disabled
     OpenPBR_ThinFilmResults results;
@@ -471,10 +467,10 @@ openpbr_thin_film_and_base_reflectance(const float cos_theta_i,       // Cosine 
 float openpbr_thin_film_presence_multiplier(const float thin_film_thickness_nm)
 {
     // Thickness below which the thin film is fully invisible
-    CONSTEXPR_LOCAL float FullInvisibilityThreshold_nm = OpenPBR_MinDenomMag;  // Slightly positive value to avoid potential numerical issues
+    OPENPBR_CONSTEXPR_LOCAL float FullInvisibilityThreshold_nm = OpenPBR_MinDenomMag;  // Slightly positive value to avoid potential numerical issues
 
     // Thickness above which the thin film is fully visible
-    CONSTEXPR_LOCAL float FullVisibilityThreshold_nm = 30.0f;  // 30 nanometers
+    OPENPBR_CONSTEXPR_LOCAL float FullVisibilityThreshold_nm = 30.0f;  // 30 nanometers
 
     return smoothstep(FullInvisibilityThreshold_nm, FullVisibilityThreshold_nm, thin_film_thickness_nm);
 }
@@ -489,7 +485,8 @@ OpenPBR_ThinFilmResults openpbr_desaturate_thin_film_reflectance(const vec3 diel
     OpenPBR_ThinFilmResults desaturated_reflectance;
     const float thin_film_desaturation_scale = min(sqrt(thin_film_thickness_nm * 0.001f * idoth), 1.0f);
 
-    desaturated_reflectance.reflectance_dielectric = mix(dielectric_reflectance, vec3(openpbr_average(dielectric_reflectance)), thin_film_desaturation_scale);
+    desaturated_reflectance.reflectance_dielectric =
+        mix(dielectric_reflectance, vec3(openpbr_average(dielectric_reflectance)), thin_film_desaturation_scale);
     desaturated_reflectance.reflectance_metal = mix(metal_reflectance, vec3(openpbr_average(metal_reflectance)), thin_film_desaturation_scale);
 
     return desaturated_reflectance;

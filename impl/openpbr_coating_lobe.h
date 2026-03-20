@@ -67,7 +67,7 @@ struct OpenPBR_CoatingLobe_AggregateLobe
 // Define how light should be tinted as it passes through the coat in one direction.
 // Light that enters the coat, reflects from the base layer, and exits the coat will
 // be tinted by this function two times, once for each passage.
-vec3 openpbr_coat_passage_color_multiplier(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const float cosine)
+vec3 openpbr_coat_passage_color_multiplier(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const float cosine)
 {
     if (cosine > 0.0f && openpbr_min3(lobe.tint) < 1.0f)
     {
@@ -87,7 +87,7 @@ vec3 openpbr_coat_passage_color_multiplier(ADDRESS_SPACE_THREAD CONST_REF(OpenPB
     }
 }
 
-float openpbr_proportion_reflected(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const float cosine)
+float openpbr_proportion_reflected(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const float cosine)
 {
     if (cosine > 0.0f)
     {
@@ -103,26 +103,28 @@ float openpbr_proportion_reflected(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Coatin
     }
 }
 
-vec3 openpbr_base_layer_scale_one_side(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+vec3 openpbr_base_layer_scale_one_side(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                                        const float cosine,
                                        const float proportion_reflected_from_this_side)
 {
     return openpbr_coat_passage_color_multiplier(lobe, cosine) * (1.0f - proportion_reflected_from_this_side);
 }
 
-vec3 openpbr_base_layer_scale_incoming(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe)
+vec3 openpbr_base_layer_scale_incoming(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe)
 {
     return lobe.in_base_layer_scale;
 }
 
-vec3 openpbr_base_layer_scale_outgoing(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const vec3 light_direction)
+vec3 openpbr_base_layer_scale_outgoing(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+                                       const vec3 light_direction)
 {
     const float odotn = dot(light_direction, lobe.normal_ff);
     const float out_reflected = openpbr_proportion_reflected(lobe, odotn);
     return openpbr_base_layer_scale_one_side(lobe, odotn, out_reflected);
 }
 
-vec3 openpbr_base_layer_scale_complete(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const vec3 light_direction)
+vec3 openpbr_base_layer_scale_complete(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+                                       const vec3 light_direction)
 {
     const vec3 incoming = lobe.in_base_layer_scale;
     const vec3 outgoing = openpbr_base_layer_scale_outgoing(lobe, light_direction);
@@ -130,14 +132,15 @@ vec3 openpbr_base_layer_scale_complete(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Co
 }
 
 // Assumes that this is an external hit.
-float openpbr_coat_reflection_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe, const vec3 view_direction)
+float openpbr_coat_reflection_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+                                          const vec3 view_direction)
 {
     // Here we calculate the expected contribution of the coat reflection lobe relative to the overall lobe
     // and we use that to set the probability of sampling the coat reflection lobe.
 
     // TODO: Take the real path throughput into account (for both standalone lobes),
     //       either by saving it in the lobe struct or by passing it in.
-    CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
+    OPENPBR_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
 
     // Here we can use lobe.in_reflected instead of calling estimate_lobe_contribution
     // because we know the inner details of the coat reflection lobe.
@@ -150,9 +153,9 @@ float openpbr_coat_reflection_probability(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR
     return openpbr_safe_divide(coat_reflection_lobe_contribution, coat_reflection_lobe_contribution + scaled_base_lobe_contribution, 0.5f);
 }
 
-OpenPBR_DiffuseSpecular openpbr_combine_coat_and_base_evals(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
-                                                            ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DiffuseSpecular) eval_coat,
-                                                            ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_DiffuseSpecular) eval_base,
+OpenPBR_DiffuseSpecular openpbr_combine_coat_and_base_evals(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+                                                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DiffuseSpecular) eval_coat,
+                                                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_DiffuseSpecular) eval_base,
                                                             const vec3 light_direction)
 {
     return openpbr_add_diffuse_specular(openpbr_scale_diffuse_specular(eval_coat, lobe.presence),
@@ -160,7 +163,7 @@ OpenPBR_DiffuseSpecular openpbr_combine_coat_and_base_evals(ADDRESS_SPACE_THREAD
 }
 
 // Assumes that child lobe has already been initialized.
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                              const vec3 normal_ff,
                              const vec3 view_direction,
                              const vec3 tint,
@@ -182,7 +185,7 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_CoatingLobe_Aggr
                                                         //  This lets us avoid storing it and allows it to be applied to emission as well.)
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe)
 {
     if (lobe.inside)
     {
@@ -194,7 +197,7 @@ OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPB
     }
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
@@ -214,7 +217,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     }
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -234,13 +237,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingL
 // evaluate the throughput and pdf for this direction,
 // and return whether a sample was successfully generated.
 // Output arguments are only set when the function returns true.
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     if (lobe.inside)
     {
@@ -322,7 +325,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_Aggr
     }
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_CoatingLobe_AggregateLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

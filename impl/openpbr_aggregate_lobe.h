@@ -35,14 +35,14 @@
 // These lobes are assumed to be already weighted so that they can exist side by side without any nesting logic.
 // In the names below, the acronym MMS stands for "microfacet multiple scattering".
 
-CONSTEXPR_GLOBAL int OpenPBR_InvalidLobeIndex = -1;
-CONSTEXPR_GLOBAL int OpenPBR_SpecularLobeIndex = 0;
-CONSTEXPR_GLOBAL int OpenPBR_DielectricMMSLobeIndex = 1;
-CONSTEXPR_GLOBAL int OpenPBR_MetalMMSLobeIndex = 2;
-CONSTEXPR_GLOBAL int OpenPBR_DiffuseLobeIndex = 3;
-CONSTEXPR_GLOBAL int OpenPBR_ThinWallSpecularTransLobeIndex = 4;
-CONSTEXPR_GLOBAL int OpenPBR_ThinWallDiffuseTransLobeIndex = 5;
-CONSTEXPR_GLOBAL int OpenPBR_NumBaseLobes = 6;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_InvalidLobeIndex = -1;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_SpecularLobeIndex = 0;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_DielectricMMSLobeIndex = 1;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_MetalMMSLobeIndex = 2;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_DiffuseLobeIndex = 3;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_ThinWallSpecularTransLobeIndex = 4;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_ThinWallDiffuseTransLobeIndex = 5;
+OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_NumBaseLobes = 6;
 
 struct OpenPBR_AggregateLobe
 {
@@ -56,17 +56,17 @@ struct OpenPBR_AggregateLobe
     float lobe_weights[OpenPBR_NumBaseLobes];
 };
 
-int openpbr_select_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe,
-                        ADDRESS_SPACE_THREAD INOUT(float) rand,
-                        ADDRESS_SPACE_THREAD OUT(float) selected_lobe_weight,
-                        ADDRESS_SPACE_THREAD OUT(float) total_weight)
+int openpbr_select_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe,
+                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(float) rand,
+                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) selected_lobe_weight,
+                        OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) total_weight)
 {
     total_weight = 0.0f;
 
     total_weight += lobe.lobe_weights[OpenPBR_SpecularLobeIndex];
-    if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
         total_weight += lobe.lobe_weights[OpenPBR_DielectricMMSLobeIndex];
-    if (GET_SPECIALIZATION_CONSTANT(EnableMetallic))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic))
         total_weight += lobe.lobe_weights[OpenPBR_MetalMMSLobeIndex];
     total_weight += lobe.lobe_weights[OpenPBR_DiffuseLobeIndex];
     total_weight += lobe.lobe_weights[OpenPBR_ThinWallSpecularTransLobeIndex];
@@ -83,9 +83,9 @@ int openpbr_select_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lo
         return OpenPBR_InvalidLobeIndex;
     }
 
-    ASSERT(rand < 1.0f, "Random number unexpectedly large");
+    OPENPBR_ASSERT(rand < 1.0f, "Random number unexpectedly large");
     rand *= total_weight;
-    ASSERT(rand < total_weight, "Random number unexpectedly large");
+    OPENPBR_ASSERT(rand < total_weight, "Random number unexpectedly large");
 
     float weight_so_far = 0.0f;
 
@@ -93,8 +93,8 @@ int openpbr_select_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lo
     for (int lobe_index = 0; lobe_index < OpenPBR_NumBaseLobes - 1; ++lobe_index)
     {
         // Skip any lobes that are disabled by specialization constants.
-        if ((!GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && lobe_index == OpenPBR_DielectricMMSLobeIndex) ||
-            (!GET_SPECIALIZATION_CONSTANT(EnableMetallic) && lobe_index == OpenPBR_MetalMMSLobeIndex))
+        if ((!OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && lobe_index == OpenPBR_DielectricMMSLobeIndex) ||
+            (!OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic) && lobe_index == OpenPBR_MetalMMSLobeIndex))
             continue;
 
         selected_lobe_weight = lobe.lobe_weights[lobe_index];
@@ -107,25 +107,27 @@ int openpbr_select_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lo
         weight_so_far += selected_lobe_weight;
     }
 
-    CONSTEXPR_LOCAL int OpenPBR_LastLobeIndex = OpenPBR_NumBaseLobes - 1;
+    OPENPBR_CONSTEXPR_LOCAL int OpenPBR_LastLobeIndex = OpenPBR_NumBaseLobes - 1;
     // The very last lobe is currently the thin-wall diffuse-transmission lobe.
-    STATIC_ASSERT(OpenPBR_LastLobeIndex == OpenPBR_ThinWallDiffuseTransLobeIndex, "Unexpected lobe index");
+    OPENPBR_STATIC_ASSERT(OpenPBR_LastLobeIndex == OpenPBR_ThinWallDiffuseTransLobeIndex, "Unexpected lobe index");
     selected_lobe_weight = lobe.lobe_weights[OpenPBR_LastLobeIndex];
     // The logic is simplified on the last iteration.
-    ASSERT(weight_so_far + selected_lobe_weight == total_weight, "New sum should be identical to earlier sum");
+    OPENPBR_ASSERT(weight_so_far + selected_lobe_weight == total_weight, "New sum should be identical to earlier sum");
     rand = (rand - weight_so_far) / selected_lobe_weight;
     openpbr_clamp_remapped_random_number(rand);
     return OpenPBR_LastLobeIndex;
 }
 
 // Assumes that child lobes have already been initialized.
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_AggregateLobe) lobe, const vec3 view_direction, const vec3 path_throughput)
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_AggregateLobe) lobe,
+                             const vec3 view_direction,
+                             const vec3 path_throughput)
 {
     lobe.lobe_weights[OpenPBR_SpecularLobeIndex] = openpbr_estimate_lobe_contribution(lobe.specular_lobe, view_direction, path_throughput);
-    if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
         lobe.lobe_weights[OpenPBR_DielectricMMSLobeIndex] =
             openpbr_estimate_lobe_contribution(lobe.dielectric_mms_lobe, view_direction, path_throughput);
-    if (GET_SPECIALIZATION_CONSTANT(EnableMetallic))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic))
         lobe.lobe_weights[OpenPBR_MetalMMSLobeIndex] = openpbr_estimate_lobe_contribution(lobe.metal_mms_lobe, view_direction, path_throughput);
     lobe.lobe_weights[OpenPBR_DiffuseLobeIndex] = openpbr_estimate_lobe_contribution(lobe.diffuse_lobe, view_direction, path_throughput);
     lobe.lobe_weights[OpenPBR_ThinWallSpecularTransLobeIndex] =
@@ -134,14 +136,14 @@ void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_AggregateLobe) l
         openpbr_estimate_lobe_contribution(lobe.thin_wall_diffuse_trans_lobe, view_direction, path_throughput);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe)
 {
     OpenPBR_BsdfLobeType result = OpenPBR_BsdfLobeTypeNone;
 
     result |= openpbr_get_lobe_type(lobe.specular_lobe);
-    if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
         result |= openpbr_get_lobe_type(lobe.dielectric_mms_lobe);
-    if (GET_SPECIALIZATION_CONSTANT(EnableMetallic))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic))
         result |= openpbr_get_lobe_type(lobe.metal_mms_lobe);
     result |= openpbr_get_lobe_type(lobe.diffuse_lobe);
     result |= openpbr_get_lobe_type(lobe.thin_wall_specular_trans_lobe);
@@ -150,16 +152,16 @@ OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPB
     return result;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe,
+OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe,
                                                      const vec3 view_direction,
                                                      const vec3 light_direction)
 {
     OpenPBR_DiffuseSpecular result = openpbr_make_zero_diffuse_specular();
 
     result = openpbr_add_diffuse_specular(result, openpbr_calculate_lobe_value(lobe.specular_lobe, view_direction, light_direction));
-    if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
         result = openpbr_add_diffuse_specular(result, openpbr_calculate_lobe_value(lobe.dielectric_mms_lobe, view_direction, light_direction));
-    if (GET_SPECIALIZATION_CONSTANT(EnableMetallic))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic))
         result = openpbr_add_diffuse_specular(result, openpbr_calculate_lobe_value(lobe.metal_mms_lobe, view_direction, light_direction));
     result = openpbr_add_diffuse_specular(result, openpbr_calculate_lobe_value(lobe.diffuse_lobe, view_direction, light_direction));
     result = openpbr_add_diffuse_specular(result, openpbr_calculate_lobe_value(lobe.thin_wall_specular_trans_lobe, view_direction, light_direction));
@@ -168,7 +170,9 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     return result;
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe, const vec3 view_direction, const vec3 light_direction)
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe,
+                                 const vec3 view_direction,
+                                 const vec3 light_direction)
 {
     float sum = 0.0f;
     float total_weight = 0.0f;
@@ -178,13 +182,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Aggregat
         sum += weight * openpbr_calculate_lobe_pdf(lobe.specular_lobe, view_direction, light_direction);
         total_weight += weight;
     }
-    if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
     {
         const float weight = lobe.lobe_weights[OpenPBR_DielectricMMSLobeIndex];
         sum += weight * openpbr_calculate_lobe_pdf(lobe.dielectric_mms_lobe, view_direction, light_direction);
         total_weight += weight;
     }
-    if (GET_SPECIALIZATION_CONSTANT(EnableMetallic))
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic))
     {
         const float weight = lobe.lobe_weights[OpenPBR_MetalMMSLobeIndex];
         sum += weight * openpbr_calculate_lobe_pdf(lobe.metal_mms_lobe, view_direction, light_direction);
@@ -213,13 +217,13 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Aggregat
 // evaluate the throughput and pdf for this direction,
 // and return whether a sample was successfully generated.
 // Output arguments are only set when the function returns true.
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     float rand_x = rand.x;
     float selected_lobe_weight;
@@ -237,9 +241,9 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) l
     bool valid_sample = false;
     if (selected_lobe_index == OpenPBR_SpecularLobeIndex)
         valid_sample = openpbr_sample_lobe(lobe.specular_lobe, remapped_rand, view_direction, light_direction, weight, pdf, sampled_type);
-    else if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && selected_lobe_index == OpenPBR_DielectricMMSLobeIndex)
+    else if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && selected_lobe_index == OpenPBR_DielectricMMSLobeIndex)
         valid_sample = openpbr_sample_lobe(lobe.dielectric_mms_lobe, remapped_rand, view_direction, light_direction, weight, pdf, sampled_type);
-    else if (GET_SPECIALIZATION_CONSTANT(EnableMetallic) && selected_lobe_index == OpenPBR_MetalMMSLobeIndex)
+    else if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic) && selected_lobe_index == OpenPBR_MetalMMSLobeIndex)
         valid_sample = openpbr_sample_lobe(lobe.metal_mms_lobe, remapped_rand, view_direction, light_direction, weight, pdf, sampled_type);
     else if (selected_lobe_index == OpenPBR_DiffuseLobeIndex)
         valid_sample = openpbr_sample_lobe(lobe.diffuse_lobe, remapped_rand, view_direction, light_direction, weight, pdf, sampled_type);
@@ -250,7 +254,9 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) l
         valid_sample =
             openpbr_sample_lobe(lobe.thin_wall_diffuse_trans_lobe, remapped_rand, view_direction, light_direction, weight, pdf, sampled_type);
     else
-        ASSERT_UNREACHABLE("Invalid lobe index");
+    {
+        OPENPBR_ASSERT_UNREACHABLE("Invalid lobe index");
+    }
 
     if (!valid_sample)
         return false;
@@ -258,7 +264,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) l
     // Compute overall weight and pdf with all matched lobes.
     if (!bool(sampled_type & OpenPBR_BsdfLobeTypeSpecular))
     {
-        ASSERT(pdf > 0.0f, "Non-delta lobe samples must either set a positive PDF or return false");
+        OPENPBR_ASSERT(pdf > 0.0f, "Non-delta lobe samples must either set a positive PDF or return false");
         OpenPBR_DiffuseSpecular bsdf_cos = openpbr_scale_diffuse_specular(weight, pdf);
         pdf *= selected_lobe_weight;
 
@@ -267,14 +273,14 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) l
             bsdf_cos = openpbr_add_diffuse_specular(bsdf_cos, openpbr_calculate_lobe_value(lobe.specular_lobe, view_direction, light_direction));
             pdf += lobe.lobe_weights[OpenPBR_SpecularLobeIndex] * openpbr_calculate_lobe_pdf(lobe.specular_lobe, view_direction, light_direction);
         }
-        if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && selected_lobe_index != OpenPBR_DielectricMMSLobeIndex)
+        if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && selected_lobe_index != OpenPBR_DielectricMMSLobeIndex)
         {
             bsdf_cos =
                 openpbr_add_diffuse_specular(bsdf_cos, openpbr_calculate_lobe_value(lobe.dielectric_mms_lobe, view_direction, light_direction));
             pdf += lobe.lobe_weights[OpenPBR_DielectricMMSLobeIndex] *
                    openpbr_calculate_lobe_pdf(lobe.dielectric_mms_lobe, view_direction, light_direction);
         }
-        if (GET_SPECIALIZATION_CONSTANT(EnableMetallic) && selected_lobe_index != OpenPBR_MetalMMSLobeIndex)
+        if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic) && selected_lobe_index != OpenPBR_MetalMMSLobeIndex)
         {
             bsdf_cos = openpbr_add_diffuse_specular(bsdf_cos, openpbr_calculate_lobe_value(lobe.metal_mms_lobe, view_direction, light_direction));
             pdf += lobe.lobe_weights[OpenPBR_MetalMMSLobeIndex] * openpbr_calculate_lobe_pdf(lobe.metal_mms_lobe, view_direction, light_direction);
@@ -315,7 +321,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) l
     return true;
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_AggregateLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_AggregateLobe) lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {
@@ -323,8 +329,8 @@ float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_
 
     for (int lobe_index = 0; lobe_index < OpenPBR_NumBaseLobes; ++lobe_index)
     {
-        if ((!GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && lobe_index == OpenPBR_DielectricMMSLobeIndex) ||
-            (!GET_SPECIALIZATION_CONSTANT(EnableMetallic) && lobe_index == OpenPBR_MetalMMSLobeIndex))
+        if ((!OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && lobe_index == OpenPBR_DielectricMMSLobeIndex) ||
+            (!OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableMetallic) && lobe_index == OpenPBR_MetalMMSLobeIndex))
             continue;
 
         result += lobe.lobe_weights[lobe_index];

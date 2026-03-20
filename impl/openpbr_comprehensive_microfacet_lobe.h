@@ -39,13 +39,14 @@ struct OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe
     vec3 path_throughput;
 };
 
-vec3 openpbr_channel_probabilities(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe)
+vec3 openpbr_channel_probabilities(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe)
 {
     return lobe.path_throughput / openpbr_sum(lobe.path_throughput);
 }
 
-bool openpbr_validate_half_vector_for_transmission(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
-                                                   const vec3 half_vector)
+bool openpbr_validate_half_vector_for_transmission(
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+    const vec3 half_vector)
 {
     // The computed half vector should point into the less dense medium.
     // If the face-forwarded normal points into the less dense medium, half_vector is valid if it faces forward into the less dense medium.
@@ -54,29 +55,31 @@ bool openpbr_validate_half_vector_for_transmission(ADDRESS_SPACE_THREAD CONST_RE
            (lobe.eta_t_over_eta_i.r < 1.0f && dot(lobe.normal_ff, half_vector) < 0.0f);
 }
 
-void openpbr_initialize_lobe(ADDRESS_SPACE_THREAD INOUT(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
                              const vec3 normal_ff,
                              const OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution microfacet_distr,
                              const OpenPBR_ComprehensiveReflectionTransmissionCoefficient refl_trans_coeff,
                              const vec3 eta_t_over_eta_i,
                              const vec3 path_throughput)
 {
-    ASSERT(openpbr_is_normalized(normal_ff), "The input normal is assumed to be normalized");
+    OPENPBR_ASSERT(openpbr_is_normalized(normal_ff), "The input normal is assumed to be normalized");
 
-    lobe = MAKE_STRUCT_5(
+    lobe = OPENPBR_MAKE_STRUCT_5(
         OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe, normal_ff, microfacet_distr, refl_trans_coeff, eta_t_over_eta_i, path_throughput);
 }
 
-OpenPBR_BsdfLobeType openpbr_get_lobe_type(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe)
+OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe)
+                                               lobe)
 {
-    return GET_SPECIALIZATION_CONSTANT(EnableTranslucency)
+    return OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency)
                ? OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection | OpenPBR_BsdfLobeTypeTransmission
                : OpenPBR_BsdfLobeTypeGlossy | OpenPBR_BsdfLobeTypeReflection;
 }
 
-OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
-                                                     const vec3 view_direction,
-                                                     const vec3 light_direction)
+OpenPBR_DiffuseSpecular
+openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+                             const vec3 view_direction,
+                             const vec3 light_direction)
 {
     const float idotn = dot(lobe.normal_ff, view_direction);
     const float odotn = dot(lobe.normal_ff, light_direction);
@@ -97,9 +100,9 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
 
         return openpbr_make_diffuse_specular_from_specular(G * D_other_terms_F);
     }
-    else if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && idotn * odotn < 0.0f)  // transmission
+    else if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && idotn * odotn < 0.0f)  // transmission
     {
-        if (GET_SPECIALIZATION_CONSTANT(EnableDispersion))
+        if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion))
         {
             vec3 D_other_terms_F;
             for (int channel = 0; channel < OpenPBR_NumRgbChannels; ++channel)
@@ -162,7 +165,7 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(ADDRESS_SPACE_THREAD CONST_
     //         result /= odotn;
 }
 
-float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
                                  const vec3 view_direction,
                                  const vec3 light_direction)
 {
@@ -190,9 +193,9 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Comprehe
 
         return G_masking * F_prob_D_other_terms;
     }
-    else if (GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && idotn * odotn < 0.0f)  // transmission
+    else if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) && idotn * odotn < 0.0f)  // transmission
     {
-        if (GET_SPECIALIZATION_CONSTANT(EnableDispersion))
+        if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion))
         {
             vec3 F_prob_D_other_terms;
             for (int channel = 0; channel < OpenPBR_NumRgbChannels; ++channel)
@@ -251,18 +254,18 @@ float openpbr_calculate_lobe_pdf(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_Comprehe
         return 0.0f;
 }
 
-bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
                          const vec3 rand,
                          const vec3 view_direction,
-                         ADDRESS_SPACE_THREAD OUT(vec3) light_direction,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_DiffuseSpecular) weight,
-                         ADDRESS_SPACE_THREAD OUT(float) pdf,
-                         ADDRESS_SPACE_THREAD OUT(OpenPBR_BsdfLobeType) sampled_type)
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) light_direction,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_DiffuseSpecular) weight,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(float) pdf,
+                         OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_BsdfLobeType) sampled_type)
 {
     const float idotn = dot(view_direction, lobe.normal_ff);
 
     // Choose microfacet normal_ff (in world space).
-    const vec3 half_vector = openpbr_sample_ggx_smith_vndf(lobe.microfacet_distr, view_direction, lobe.normal_ff, SWIZZLE(rand, xy));
+    const vec3 half_vector = openpbr_sample_ggx_smith_vndf(lobe.microfacet_distr, view_direction, lobe.normal_ff, OPENPBR_SWIZZLE(rand, xy));
 
     const float idoth = dot(view_direction, half_vector);
     // Sampled microfacet normal is expected to be in incident hemisphere,
@@ -287,7 +290,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMic
         return false;
     }
 
-    if (!GET_SPECIALIZATION_CONSTANT(EnableTranslucency) || rand.z < P_refl)  // reflection
+    if (!OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency) || rand.z < P_refl)  // reflection
     {
         // The light direction is normalized by construction, but can be significantly off due to rounding error.
         light_direction = openpbr_fast_normalize(-view_direction + half_vector * 2.0f * idoth);
@@ -303,7 +306,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMic
         const float odoth = dot(light_direction, half_vector);
 
         // If the input normal and view direction are normalized, this assertion should never fail.
-        ASSERT(odoth >= 0.0f, "odoth is expected to be non-negative");
+        OPENPBR_ASSERT(odoth >= 0.0f, "odoth is expected to be non-negative");
 
         const float G_shadowing = openpbr_eval_smith_g1(lobe.microfacet_distr, light_direction, odotn);
         weight = openpbr_make_diffuse_specular_from_specular((F_refl * (1.0f / P_refl)) * G_shadowing);
@@ -325,7 +328,7 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMic
     }
     else  // transmission
     {
-        if (GET_SPECIALIZATION_CONSTANT(EnableDispersion))
+        if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion))
         {
             const float remapped_rand_z = (rand.z - P_refl) / P_trans;
             int selected_color_channel;
@@ -407,7 +410,8 @@ bool openpbr_sample_lobe(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMic
     }
 }
 
-float openpbr_estimate_lobe_contribution(ADDRESS_SPACE_THREAD CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe) lobe,
+float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ComprehensiveMicrofacetReflectionTransmissionLobe)
+                                             lobe,
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {

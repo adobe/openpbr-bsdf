@@ -1,6 +1,6 @@
 # Adobe's OpenPBR BSDF
 
-A self-contained, portable implementation of the [OpenPBR 1.0](https://openpbr.org/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
+A self-contained, portable implementation of the [OpenPBR 1.0](https://academysoftwarefoundation.github.io/OpenPBR/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
 
 ---
 
@@ -29,7 +29,7 @@ Note: This is shared as a reference implementation, not run as a community-drive
 - **Single-include API:** `#include "openpbr.h"` brings in the complete public API — all types, settings, and the full BSDF.
 - **Multi-language support:** C++, GLSL, CUDA, MSL, or Slang from the same source via a thin interop layer.
 - **Self-contained:** No globals, no hidden dependencies – everything lives alongside the BSDF.
-- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, energy table storage type, fast math, and custom interop.
+- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, fast math overrides, conflict-suppression hooks, specialization constants, and custom interop.
 - **Fixed-lobe architecture:** One class per material component.
 - **Energy-conserving:** The BSDF is designed to be energy-conserving for most common configurations, using precomputed LUTs for multiple-scattering compensation.
 - **Reciprocal:** The BSDF satisfies Helmholtz reciprocity for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the exception with transmission. (Note that reciprocity may be traded for better energy conservation in future versions.)
@@ -42,6 +42,7 @@ Note: This is shared as a reference implementation, not run as a community-drive
 openpbr/
 ├── openpbr.h                     ← Single include for the entire public API
 ├── openpbr_settings.h            ← Compile-time feature flags and configuration
+├── openpbr_data_constants.h      ← LUT dimensions and LUT ID constants
 ├── interop/                      ← Cross-language macro layer (auto-detected per backend)
 │   ├── openpbr_interop.h         ← Router: selects the correct backend header
 │   └── ...                       ← Per-backend headers (C++, GLSL, CUDA, MSL, Slang)
@@ -59,7 +60,6 @@ openpbr/
     ├── openpbr_aggregate_lobe.h           ← Base layer aggregate
     ├── ...                                ← Other lobe implementations and utilities
     └── data/                              ← Lookup table data arrays
-        ├── openpbr_data_constants.h       ← LUT dimensions and types
         ├── openpbr_energy_arrays.h        ← Energy compensation table declarations (7 tables)
         ├── openpbr_energy_array_access.h  ← Energy table sampling utilities
         ├── openpbr_ltc_array.h            ← LTC table declaration for fuzz lobe
@@ -124,13 +124,13 @@ These tables support two modes via the `OPENPBR_USE_TEXTURE_LUTS` compile-time s
 **Array Mode is the default** because it eliminates external dependencies on texture assets and binding infrastructure.
 
 Source data format:
-- All LUT data is stored in separate header files in the `data/` directory
+- All LUT data is stored in separate header files in the `impl/data/` directory
 - Data is formatted as flattened C arrays matching the original multi-dimensional layout (e.g., `array[x][y][z]` with rightmost index contiguous)
 - Users can read these files directly to populate GPU textures if needed
 
 Implementation details:
 - Energy tables: 32×32 or 32×32×32 normalized integer values [0, 65535] → [0.0, 1.0]
-  - Storage type configurable via `OPENPBR_ENERGY_TABLES_USE_UINT16` (defaults to `uint` for GLSL compatibility)
+  - Storage type is auto-selected per language by the interop layer: 16-bit (`unsigned short`) for C++/MSL/CUDA/Slang; 32-bit (`uint`) for GLSL — no user action required
 - LTC table: 32×32 vec3 values
 - Both modes use identical indexing and coordinate mappings for exact equivalence
 
@@ -143,18 +143,21 @@ Implementation details:
 3. Select a shading language backend. Three backends are auto-detected from built-in compiler macros:
    - CUDA (`__CUDACC__`), MSL (`__METAL_VERSION__`), and C++ (`__cplusplus`) are detected automatically.
    - GLSL is the default fallback when none of the above macros are defined – no explicit setting needed.
-   - Slang has no standard built-in detection macro, so it **requires** `OPENPBR_LANGUAGE_TARGET_SLANG=1` to be defined before including `openpbr.h`. Without it, the GLSL backend will be selected, which will likely fail to compile under the Slang compiler.
+   - Slang has no standard built-in detection macro, so it **requires** `OPENPBR_LANGUAGE_TARGET_SLANG=1` to be defined before including `openpbr.h`. Without it, the GLSL backend will be selected, which will likely fail to compile under the Slang compiler. (For HLSL-style pipelines, use this Slang path.)
 
    Any backend can also be forced explicitly by setting the corresponding `OPENPBR_LANGUAGE_TARGET_CPP`, `_GLSL`, `_MSL`, `_CUDA`, or `_SLANG` flag, which overrides auto-detection.
 
    **C++ users** must also pre-include GLM (`<glm/glm.hpp>`) before `openpbr.h`; the interop header will emit a clear error if it is missing. See `minimal_cpp_example.cpp` for a complete working example.
-4. Choose lookup table mode: Set `OPENPBR_USE_TEXTURE_LUTS` to 0 for self-contained array mode (default) or 1 for texture mode. In texture mode, `GET_2D_TEXTURE(handle)`, `GET_3D_TEXTURE(handle)`, and `GET_BINDING(name)` macros must be defined before `openpbr.h`; the headers will emit clear errors if they are missing.
-5. Optional – Configure energy table storage: Set `OPENPBR_ENERGY_TABLES_USE_UINT16` to 1 for memory-efficient 16-bit storage if your shading language supports it (MSL, C++, CUDA, Slang). Defaults to 0 (`uint`) for GLSL compatibility, which does not support 16-bit integers in the core specification.
-6. Optional – Fast math: Set `OPENPBR_USE_FAST_MATH_APPROXIMATIONS` to 1 to replace standard math with renderer-supplied fast approximations. You must define `openpbr_fast_rcp_sqrt`, `openpbr_fast_sqrt` (float and vec3), and `openpbr_fast_normalize` before including `openpbr.h`.
-7. Populate `OpenPBR_ResolvedInputs` with texture-evaluated parameters and geometry data, or start with `openpbr_make_default_resolved_inputs()` and override specific properties.
-8. Initialize the BSDF by calling `openpbr_prepare_bsdf_and_volume()`, which returns an `OpenPBR_PreparedBsdf` ready for evaluation.
-9. Evaluate using `openpbr_eval()`, `openpbr_sample()`, or `openpbr_pdf()` with the prepared BSDF.
-10. **Advanced:** As an alternative to `openpbr_prepare_bsdf_and_volume()`, call `openpbr_prepare_volume()` and `openpbr_prepare_lobes()` separately in that order:
+4. Choose lookup table mode: Set `OPENPBR_USE_TEXTURE_LUTS` to 0 for self-contained array mode (default) or 1 for texture mode. In texture mode, define `OPENPBR_SAMPLE_2D_TEXTURE(lut_id, uv)` and `OPENPBR_SAMPLE_3D_TEXTURE(lut_id, uvw)` before `openpbr.h`; the headers emit clear errors if either macro is missing. The available texture IDs are documented in `openpbr_data_constants.h`.
+5. Optional – Pre-include hooks: Define any of the following before `openpbr.h` to customize behavior:
+   - **Fast math:** `OPENPBR_FAST_RCP_SQRT(x)`, `OPENPBR_FAST_SQRT(x)`, `OPENPBR_FAST_NORMALIZE(v)` — supply faster platform-specific implementations (GPU hardware intrinsics, CPU approximations, etc.). Any undefined hook falls back to the standard library.
+   - **Conflict suppression:** Set `OPENPBR_USE_CUSTOM_SATURATE = 1` if your host already defines `saturate()`; set `OPENPBR_USE_CUSTOM_VEC_TYPES = 1` if it already provides `vec2`/`vec3`/`vec4` and, in C++, the GLM math function aliases. (For GLSL the vec types are built-in, so `OPENPBR_USE_CUSTOM_VEC_TYPES` has no effect on that backend.)
+   - **Specialization constants:** Override `OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default_value)` and `OPENPBR_GET_SPECIALIZATION_CONSTANT(name)` if your renderer has a real specialization constant pipeline (Vulkan `layout(constant_id)`, Metal `function_constant`, etc.). The defaults produce plain compile-time booleans, which is correct for offline renderers and standalone use. Both macros must be defined together; see `openpbr_settings.h` for the full contract.
+   - **Custom interop (advanced):** Set `OPENPBR_USE_CUSTOM_INTEROP = 1` and provide your own interop header before `openpbr.h` to replace the entire language abstraction layer. Prefer `OPENPBR_USE_CUSTOM_SATURATE` and `OPENPBR_USE_CUSTOM_VEC_TYPES` for targeted suppressions; reach for this only if you need to replace every macro OpenPBR defines.
+6. Populate `OpenPBR_ResolvedInputs` with texture-evaluated parameters and geometry data, or start with `openpbr_make_default_resolved_inputs()` and override specific properties.
+7. Initialize the BSDF by calling `openpbr_prepare_bsdf_and_volume()`, which returns an `OpenPBR_PreparedBsdf` ready for evaluation.
+8. Evaluate using `openpbr_eval()`, `openpbr_sample()`, or `openpbr_pdf()` with the prepared BSDF.
+9. **Advanced:** As an alternative to `openpbr_prepare_bsdf_and_volume()`, call `openpbr_prepare_volume()` and `openpbr_prepare_lobes()` separately in that order:
    - `openpbr_prepare_volume()` must always be called first — it sets up volume properties, thin-wall behavior, and transmission tint regardless of whether volumes are enabled.
    - `openpbr_prepare_lobes()` can then be called to prepare the BSDF lobes. It can be skipped when only the volume is needed (e.g., for shadow rays or scene-wide volume queries).
 
@@ -273,18 +276,20 @@ We welcome issues and pull requests, for example:
 - Enhancements to the simple demo app (with the goal of keeping it minimal, self-contained, and readable — it illustrates how to use the BSDF API, not how to build a renderer; more complex tests belong in a separate program)
 - Expanded unit tests for evaluation, sampling, and energy conservation
 - Testing of the CUDA backend, which hasn't yet been used in production code
+- Testing of the Slang backend in HLSL-style pipelines (and, if needed, adapting the Slang interop aliases or proposing a dedicated HLSL interop header)
 
 Planned or potential future work:
 
-- Specialization constants for per-lobe feature toggles exist internally but aren't yet clearly exposed to users; more specialization constants may also be added (e.g., for thin-film and thin-wall) to cover additional lobes
+- Specialization constants currently cover four per-lobe feature toggles (`EnableSheenAndCoat`, `EnableDispersion`, `EnableTranslucency`, `EnableMetallic`), all defaulting to `true`; more may be added (e.g., for thin-film and thin-wall) to cover additional lobes
 - A transmission helper for translucent shadow rays exists internally but is not yet part of the public API
 - Reciprocity may be traded for better energy conservation in a future version
+- 1D texture sampler support: energy tables with a single dimension are currently stored as thin 2D textures (1 × N); using a real 1D sampler when the platform supports it would reduce sampler overhead
 - Implementing OpenPBR 1.2
 - Continued iteration on the implementation — some naming conventions and API details may evolve as this is live production code
 
 When contributing code, please follow the existing style: `snake_case` for names, `const` on every variable and parameter that won't be reassigned, and descriptive full-word names — no nonstandard abbreviations or single-letter variables except in tightly scoped math contexts.
 
-Please refer to [CONTRIBUTING.md](https://github.com/adobe/.github/blob/main/.github/CONTRIBUTING.md) for details and guidelines.
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for details and guidelines.
 
 ---
 
