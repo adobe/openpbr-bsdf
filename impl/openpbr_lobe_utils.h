@@ -152,7 +152,7 @@ vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, 
 // Input vector is in local (z-up) space.
 float openpbr_eval_aniso_smith_g1(const vec3 v, const vec2 alpha)
 {
-    if (v.z <= 0.0f)
+    if (v.z == 0.0f)
         return 0.0f;
     const float lambda =
         (-1.0f + openpbr_fast_sqrt(1.0f + (openpbr_square(alpha.x) * openpbr_square(v.x) + openpbr_square(alpha.y) * openpbr_square(v.y)) /
