@@ -35,7 +35,7 @@ struct OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution
     OpenPBR_Basis basis_ff;
 
     // Can be used by the client lobes to get the original or standard isotropic alpha value,
-    // which is needed for auxillary operations like creating microfacet-multiple-scattering lobes
+    // which is needed for auxiliary operations like creating microfacet-multiple-scattering lobes
     // and estimating lobe contributions.
     float isotropic_alpha;
 };
@@ -117,10 +117,9 @@ float openpbr_eval_ggx(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Is
                        const vec3 half_vector,
                        const vec3 normal_ff)
 {
+    // For the isotropic case this is algebraically equivalent to evaluating isotropic GGX from abs(dot(half_vector, normal_ff)),
+    // but this local-space form is more numerically stable at low roughnesses.
     return openpbr_eval_aniso_ggx(openpbr_world_to_local(openpbr_make_basis(normal_ff), half_vector), vec2(microfacet_distr.alpha));
-    // This code works too, but it is less numerically stable at low roughnesses:
-    //     const float hdotn = dot(half_vector, normal_ff);
-    //     return openpbr_eval_iso_ggx(abs(hdotn), microfacet_distr.alpha);
 }
 
 float openpbr_eval_smith_g1(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,

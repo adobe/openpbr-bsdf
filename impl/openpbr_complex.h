@@ -80,7 +80,7 @@ openpbr_complex openpbr_complex_sqrt(const openpbr_complex z)
 {
     const float r = length(z);
 
-    const float a = sqrt((r + z.x) * 0.5f);
+    const float a = sqrt(max((r + z.x) * 0.5f, 0.0f));
     const float b = openpbr_sign_nonzero(z.y) * sqrt(max((r - z.x) * 0.5f, 0.0f));
 
     return openpbr_complex(a, b);

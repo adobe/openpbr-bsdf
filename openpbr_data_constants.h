@@ -35,7 +35,7 @@
 // =======================
 
 #define OpenPBR_EnergyTableSize 32  // energy compensation tables
-#define OpenPBR_LTCTableSize    32  // LTC sheen table
+#define OpenPBR_LTCTableSize 32     // LTC sheen table
 
 // ================
 // LUT ID Constants

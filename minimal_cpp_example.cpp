@@ -49,7 +49,8 @@ static float lcg_float(std::uint32_t& state)
 
 int main()
 {
-    // Set up a simple material.
+    // 1. Set up a simple material.
+
     OpenPBR_ResolvedInputs inputs = openpbr_make_default_resolved_inputs();
     inputs.base_color = vec3(0.8f, 0.3f, 0.1f);  // terracotta
     inputs.specular_roughness = 0.4f;
@@ -60,7 +61,9 @@ int main()
     // In a real renderer, replace it with world-space vectors from the geometry,
     // and keep view_direction and light_direction in that same space.
 
-    // Prepare the BSDF. view_direction points away from the surface toward the camera
+    // 2. Prepare the BSDF.
+
+    // view_direction points away from the surface toward the camera
     // and must be in the same space as shading_basis. Here it is 45 degrees from the surface normal.
     const vec3 view_direction = normalize(vec3(1.0f, 0.0f, 1.0f));
 
@@ -70,7 +73,8 @@ int main()
                                                                           OpenPBR_VacuumIor,              // IOR of the medium above the surface
                                                                           view_direction);
 
-    // Importance-sample the BSDF.
+    // 3. Importance-sample the BSDF.
+
     // Each xi is computed on its own line here: C++ does not guarantee argument
     // evaluation order, so vec3(f(), f(), f()) could consume RNG values in an unspecified order.
     constexpr std::uint32_t RngSeed = 12345u;  // fixed seed for reproducibility
@@ -85,7 +89,7 @@ int main()
 
     openpbr_sample(prepared, vec3(xi0, xi1, xi2), light_direction, weight, pdf, lobe_type);
 
-    // Print results.
+    // 4. Print results.
     if (pdf > 0.0f)
     {
         const vec3 weight_sum = openpbr_get_sum_of_diffuse_specular(weight);

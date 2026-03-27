@@ -141,8 +141,7 @@ float openpbr_look_up_ideal_dielectric_energy_complement(const float ior, const 
     const float exact_index_ior = openpbr_ior_to_exact_index(ior);
     const float exact_index_alpha = openpbr_alpha_to_exact_index(alpha);
     const float exact_index_cos_theta = openpbr_cos_theta_to_exact_index(cos_theta);
-    return openpbr_look_up_trilinear(
-        OpenPBR_LutId_IdealDielectricEnergyComplement, exact_index_ior, exact_index_alpha, exact_index_cos_theta);
+    return openpbr_look_up_trilinear(OpenPBR_LutId_IdealDielectricEnergyComplement, exact_index_ior, exact_index_alpha, exact_index_cos_theta);
 }
 
 float openpbr_look_up_ideal_dielectric_average_energy_complement(const float ior, const float alpha)
@@ -173,8 +172,7 @@ float openpbr_look_up_opaque_dielectric_average_energy_complement(const float io
 {
     const float exact_index_ior = openpbr_ior_to_exact_index(ior);
     const float exact_index_alpha = openpbr_alpha_to_exact_index(alpha);
-    const float table_value =
-        openpbr_look_up_bilinear(OpenPBR_LutId_OpaqueDielectricAverageEnergyComplement, exact_index_ior, exact_index_alpha);
+    const float table_value = openpbr_look_up_bilinear(OpenPBR_LutId_OpaqueDielectricAverageEnergyComplement, exact_index_ior, exact_index_alpha);
     return openpbr_extrapolate_table_value_beyond_ior_max_if_needed(table_value, ior);
 }
 

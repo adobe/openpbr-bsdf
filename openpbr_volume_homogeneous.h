@@ -258,7 +258,7 @@ OPENPBR_INLINE_FUNCTION void openpbr_sample_event_distance(OPENPBR_ADDRESS_SPACE
                             (cdf_next - cdf);  // avoid numerical issues (denominator equals probability mathematically but not numerically)
 
             if (rand_distance == 1.0f)
-                rand_distance = OpenPBR_LargestFloatBelowOne;  // avoid numerical issues (rand_distance is always less than one mathematially but can
+                rand_distance = OpenPBR_LargestFloatBelowOne;  // avoid numerical issues (rand_distance is always less than one mathematically but can
                                                                // be exactly one when calculated in single precision)
 
             break;
@@ -349,7 +349,7 @@ OPENPBR_INLINE_FUNCTION float openpbr_calculate_isotropic_phase_function_pdf()
 // The albedo is not relevant because it was already included in the distance-sampling weight.
 OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)
                                                                            volume,
-                                                                       const vec3 view_direction_wsn,
+                                                                       const vec3 view_direction,
                                                                        const vec2 rand)
 {
     OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
@@ -359,34 +359,34 @@ OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(OPENPBR_A
     const float s = 2.0f * rand.x - 1.0f;
     const float cos_theta = g == 0 ? s : (0.5f / g) * (1.0f + openpbr_square(g) - openpbr_square((1.0f - openpbr_square(g)) / (1.0f + g * s)));
 
-    const float sin_theta = sqrt(1.0f - openpbr_square(cos_theta));
+    const float sin_theta = sqrt(max(0.0f, 1.0f - openpbr_square(cos_theta)));
     const float phi = OpenPBR_TwoPi * rand.y;
 
-    const OpenPBR_Basis basis = openpbr_make_basis(-view_direction_wsn);
+    const OpenPBR_Basis basis = openpbr_make_basis(-view_direction);
     return cos_theta * basis.n + sin_theta * cos(phi) * basis.t + sin_theta * sin(phi) * basis.b;
 }
 
 // Returns the value of the anisotropic Henyey-Greenstein phase function for any direction.
 OPENPBR_INLINE_FUNCTION float
 openpbr_calculate_anisotropic_phase_function_value(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                   const vec3 view_direction_wsn,
-                                                   const vec3 light_direction_wsn)
+                                                   const vec3 view_direction,
+                                                   const vec3 light_direction)
 {
     OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
 
     // For details, see https://www.astro.umd.edu/~jph/HG_note.pdf
     const float g = volume.anisotropy;
-    const float cos_theta = dot(-view_direction_wsn, light_direction_wsn);
+    const float cos_theta = dot(-view_direction, light_direction);
     return OpenPBR_RcpFourPi * (1.0f - openpbr_square(g)) / openpbr_three_halves_power(1.0f + openpbr_square(g) - 2.0f * g * cos_theta);
 }
 
 // Returns the probability density of sampling any direction from the anisotropic Henyey-Greenstein phase function.
 OPENPBR_INLINE_FUNCTION float
 openpbr_calculate_anisotropic_phase_function_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
-                                                 const vec3 view_direction_wsn,
-                                                 const vec3 light_direction_wsn)
+                                                 const vec3 view_direction,
+                                                 const vec3 light_direction)
 {
-    return openpbr_calculate_anisotropic_phase_function_value(volume, view_direction_wsn, light_direction_wsn);
+    return openpbr_calculate_anisotropic_phase_function_value(volume, view_direction, light_direction);
 }
 
 OPENPBR_INLINE_FUNCTION OpenPBR_HomogeneousVolume openpbr_add_volumes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume)

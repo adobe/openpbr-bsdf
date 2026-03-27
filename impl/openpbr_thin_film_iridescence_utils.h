@@ -14,8 +14,8 @@
  * limitations under the License.
  ***************************************************************************/
 
-#ifndef OPENPBR_IRIDESCENCE_UTILS_H
-#define OPENPBR_IRIDESCENCE_UTILS_H
+#ifndef OPENPBR_THIN_FILM_IRIDESCENCE_UTILS_H
+#define OPENPBR_THIN_FILM_IRIDESCENCE_UTILS_H
 
 #include "../openpbr_constants.h"
 #include "openpbr_complex.h"
@@ -492,4 +492,4 @@ OpenPBR_ThinFilmResults openpbr_desaturate_thin_film_reflectance(const vec3 diel
     return desaturated_reflectance;
 }
 
-#endif  // !OPENPBR_IRIDESCENCE_UTILS_H
+#endif  // !OPENPBR_THIN_FILM_IRIDESCENCE_UTILS_H

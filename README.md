@@ -6,13 +6,13 @@ A self-contained, portable implementation of the [OpenPBR 1.0](https://academyso
 
 ## Overview
 
-OpenPBR is an "uber-shader" specification that merges [Adobe Standard Material](https://helpx.adobe.com/substance-3d-general/adobe-standard-material.html) and [Autodesk Standard Surface](https://autodesk.github.io/standard-surface/) into a single, physically plausible framework. We implement it as a fixed set of nested lobe classes (e.g., fuzz, coat), all sharing the same interface:
+OpenPBR is an "uber-shader" specification that merges [Adobe Standard Material](https://helpx.adobe.com/substance-3d-general/adobe-standard-material.html) and [Autodesk Standard Surface](https://autodesk.github.io/standard-surface/) into a single, physically plausible framework. We implement it as a fixed set of nested lobes (e.g., fuzz, coat), all sharing the same interface:
 
 - **Evaluate** the BSDF
 - **Sample** the BSDF
 - **Compute** the PDF
 
-In addition to those three core functions, the prepared BSDF exposes a single unified volume that consolidates all volumetric contributions from the full OpenPBR parameter set into one set of low-level properties. Volume integration itself is left entirely to the host renderer.
+In addition to those three core functions, the prepared BSDF exposes a single unified volume that consolidates all volumetric contributions from the full OpenPBR parameter set into one set of low-level properties. The overall volume integration is left to the host renderer, though `openpbr_volume_homogeneous.h` provides production-tested helpers for the core building blocks: distance sampling, transmittance, and phase functions.
 
 ---
 
@@ -30,7 +30,7 @@ Note: This is shared as a reference implementation, not run as a community-drive
 - **Multi-language support:** C++, GLSL, CUDA, MSL, or Slang from the same source via a thin interop layer.
 - **Self-contained:** No globals, no hidden dependencies – everything lives alongside the BSDF.
 - **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, fast math overrides, conflict-suppression hooks, specialization constants, and custom interop.
-- **Fixed-lobe architecture:** One class per material component.
+- **Fixed-lobe architecture:** One struct per material component.
 - **Energy-conserving:** The BSDF is designed to be energy-conserving for most common configurations, using precomputed LUTs for multiple-scattering compensation.
 - **Reciprocal:** The BSDF satisfies Helmholtz reciprocity for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the exception with transmission. (Note that reciprocity may be traded for better energy conservation in future versions.)
 
@@ -51,7 +51,7 @@ openpbr/
 ├── openpbr_basis.h               ← Coordinate frame utilities
 ├── openpbr_diffuse_specular.h    ← Diffuse/specular component type
 ├── openpbr_bsdf_lobe_type.h      ← BSDF lobe type flags
-├── openpbr_volume_homogeneous.h  ← Volume type (OpenPBR_HomogeneousVolume) exposed in OpenPBR_PreparedBsdf
+├── openpbr_volume_homogeneous.h  ← Volume type (OpenPBR_HomogeneousVolume) and volume integration helpers (distance sampling, transmittance, phase functions)
 ├── openpbr_api.h                 ← Public BSDF functions (prepare, sample, eval, pdf)
 └── impl/                         ← All implementation details (lobes, utilities, data)
     ├── openpbr_bsdf.h                     ← Main BSDF implementation
@@ -67,7 +67,7 @@ openpbr/
 ```
 
 1. **Resolved Inputs**
-   - `OpenPBR_ResolvedInputs` – A struct containing all official OpenPBR parameters after texture evaluation (`base_color`, `specular_roughness`, etc.), plus a few extra properties specific to this implementation.
+   - `OpenPBR_ResolvedInputs` – A struct containing the full OpenPBR 1.0 parameter set after texture evaluation (`base_color`, `specular_roughness`, etc.), plus two required non-spec additions (`shading_basis` and `coat_basis`, which replace the spec's `geometry_normal`/`geometry_tangent`/`geometry_coat_normal`/`geometry_coat_tangent` raw vectors) and two optional extensions (`specular_anisotropy_rotation_cos_sin` and `coat_anisotropy_rotation_cos_sin`). See [Departures from the OpenPBR Specification](#departures-from-the-openpbr-specification) for details.
    - `openpbr_make_default_resolved_inputs()` – Creates an `OpenPBR_ResolvedInputs` with default parameter values from the OpenPBR specification.
 
 2. **Initialization**
@@ -79,12 +79,26 @@ openpbr/
    - `openpbr_prepare_volume()` → Must be called first. Derives volume properties and transmission tint; populates `OpenPBR_VolumeDerivedProps` and the volume in `OpenPBR_PreparedBsdf`.
    - `openpbr_prepare_lobes()` → Must be called after `openpbr_prepare_volume()`. Sets up BSDF lobes using the derived volume properties; populates the lobes in `OpenPBR_PreparedBsdf`. Can be skipped if only the volume is needed (e.g., for shadow rays).
 
-3. **Shading API**
-   - `openpbr_eval()` → Returns BSDF value (includes cosine term).
+3. **Core Shading API**
+   - `openpbr_eval()` → Returns BSDF value multiplied by the cosine of the angle between the light direction and the shading normal (i.e., f(ωᵢ, ωₒ) × |cos θᵢ|).
    - `openpbr_sample()` → Importance-samples a light direction; returns weight, PDF, and sampled lobe type.
    - `openpbr_pdf()` → Returns sampling PDF for a given light direction.
 
-4. **Lobe Interface Pattern**
+4. **Volume Integration Helpers** (in `openpbr_volume_homogeneous.h`; part of the stable public API)
+
+   The BSDF exposes homogeneous volume properties via `OpenPBR_PreparedBsdf.volume`. To help integrators act on those properties, `openpbr_volume_homogeneous.h` provides a complete, production-tested set of helpers:
+   - `openpbr_sample_event_distance()` → Samples a scattering-event distance with spectrally-aware MIS across color channels.
+   - `openpbr_calculate_weight_for_event_at_distance()` / `openpbr_calculate_weight_for_surface_at_distance()` → Unbiased path weights for volume and surface interactions, respectively.
+   - `openpbr_sample_isotropic_phase_function()` / `openpbr_sample_anisotropic_phase_function()` → Importance-sample the isotropic or Henyey-Greenstein phase function.
+   - `openpbr_calculate_isotropic_phase_function_value()` / `openpbr_calculate_isotropic_phase_function_pdf()` and `openpbr_calculate_anisotropic_phase_function_value()` / `openpbr_calculate_anisotropic_phase_function_pdf()` → Evaluate phase function values and PDFs for the isotropic and Henyey-Greenstein models.
+   - `openpbr_calculate_transmittance_at_distance()` / `openpbr_calculate_transmittance_at_infinity()` → Beer–Lambert transmittance.
+   - Multiple constructors for `OpenPBR_HomogeneousVolume` from extinction+albedo, absorption+scattering, or extinction alone.
+
+5. **Advanced Shading API** (in `impl/openpbr_bsdf.h`; not yet part of the stable public API — signatures may evolve; see comments above each function for full preconditions)
+   - `openpbr_compute_emission()` → Returns emission in nits (cd/m²) after attenuation by the coat and fuzz layers.
+   - `openpbr_translucent_shadow_weight_and_prob()` → Returns a straight-through shadow weight and probability for transmissive/SSS materials, enabling a practical biased shadow shortcut.
+
+6. **Lobe Interface Pattern**
 
    GLSL has no class system, so each lobe is implemented as a plain struct paired with free functions that take the struct as their first argument. Every lobe exposes the same three function signatures:
 
@@ -203,24 +217,21 @@ A self-contained example is provided in `minimal_cpp_example.cpp`. It demonstrat
 
 ### Coordinate Space Requirements
 
-All directional vectors and geometric data passed to the BSDF must be in a **consistent coordinate space**:
+All directional vectors and geometric data passed to the BSDF must be in a consistent coordinate space:
 
 - `view_direction` and `light_direction` must use the same coordinate system
 - Typically world space, but any consistent space works (object space, tangent space, etc.)
 - Shading normals and basis vectors in `OpenPBR_ResolvedInputs` must also be in this same space
-- All directions point **away from the surface** (not toward it)
+- All directions point away from the surface (not toward it)
+- All input unit vectors (`view_direction`, `light_direction`, basis normals/tangents/bitangents) are assumed to be normalized unless otherwise specified; assertions guard this at key entry points
+
+#### Internal Local Space Convention
+
+Internally, lobes that require a local frame convert directions to a z-up local space via `OpenPBR_Basis`. In this frame the normal aligns with the +Z axis, the tangent with +X, and the bitangent with +Y. Variables suffixed with `_local` are expressed in this local frame. Callers never need to work in this space directly — it is an internal implementation detail.
 
 #### Shading Basis and Default Coordinate Frame
 
-`OpenPBR_ResolvedInputs` contains two basis fields — `shading_basis` and `coat_basis` — that are not part of the official OpenPBR parameter specification; they are required additions that describe the local coordinate frame at the surface hit point:
-
-- `shading_basis.t` — tangent vector
-- `shading_basis.b` — bitangent vector  
-- `shading_basis.n` — shading normal
-
-The default basis returned by `openpbr_make_default_resolved_inputs()` is a z-up identity frame (tangent = X, bitangent = Y, normal = Z). This is the frame assumed throughout the implementation's internal local-space calculations.
-
-In a real renderer, `shading_basis` and `coat_basis` can be populated with world-space vectors computed from the geometry at the ray–surface intersection, e.g.:
+`OpenPBR_ResolvedInputs` uses two pre-orthonormalized `OpenPBR_Basis` structs — `shading_basis` and `coat_basis` — in place of the spec's four geometry vector parameters (see [Departures from the OpenPBR Specification](#departures-from-the-openpbr-specification)). The default returned by `openpbr_make_default_resolved_inputs()` is a z-up identity frame (tangent = X, bitangent = Y, normal = Z). In a real renderer, populate them from the geometry at the ray–surface intersection, e.g.:
 
 ```cpp
 inputs.shading_basis.t = world_tangent;    // from mesh UVs or procedural tangent
@@ -236,16 +247,16 @@ As per the OpenPBR specification, distances are assumed to be in world-space uni
 
 ### View Direction Consistency
 
-The `view_direction` passed to `openpbr_prepare_bsdf_and_volume()` is **cached internally** for energy compensation calculations. This means:
+The `view_direction` passed to `openpbr_prepare_bsdf_and_volume()` is cached internally for energy compensation calculations. This means:
 
-- **The same `view_direction` must be used** for all subsequent `openpbr_eval()`, `openpbr_sample()`, and `openpbr_pdf()` calls on that prepared BSDF
+- The same `view_direction` must be used for all subsequent `openpbr_eval()`, `openpbr_sample()`, and `openpbr_pdf()` calls on that prepared BSDF
 - Using a different view direction during evaluation would produce incorrect energy compensation and physically inaccurate results
 - The cached view direction is stored in `OpenPBR_PreparedBsdf.view_direction` and automatically used by eval/sample/pdf
 - If using the split initialization path (`openpbr_prepare_volume()` + `openpbr_prepare_lobes()`), ensure you store `view_direction` in the prepared struct before calling eval/sample/pdf
 
-### Volume Integration Boundary
+### Volume Integration
 
-The BSDF computes low-level volume properties for subsurface scattering and transmission – specifically the extinction coefficient, single-scattering albedo, and phase function anisotropy – and exposes them as an `OpenPBR_HomogeneousVolume` in `OpenPBR_PreparedBsdf`. The actual volume integration (e.g., random walk) is left entirely to the integrator.
+The BSDF derives homogeneous volume properties from the OpenPBR parameter set and exposes them as `OpenPBR_PreparedBsdf.volume`. Actual volume integration (random walk, transmittance queries, shadow rays through volumes) is left to the integrator. The full set of integration helpers is catalogued in item 4 of [High-Level Architecture](#high-level-architecture) above.
 
 ### Path Tracing Direction
 
@@ -269,6 +280,52 @@ The BSDF functions return BSDF values and weights in `OpenPBR_DiffuseSpecular` f
 
 ---
 
+## Departures from the OpenPBR Specification
+
+`OpenPBR_ResolvedInputs` implements the full [OpenPBR 1.0 parameter set](https://academysoftwarefoundation.github.io/OpenPBR/) with two intentional departures described below.
+
+### 1. Geometry parameters replaced by pre-orthonormalized basis structs
+
+The OpenPBR 1.0 specification defines four geometry input parameters:
+
+| Spec parameter          | Type      | Description               |
+|-------------------------|-----------|---------------------------|
+| `geometry_normal`       | `vector3` | Surface shading normal    |
+| `geometry_tangent`      | `vector3` | Surface tangent           |
+| `geometry_coat_normal`  | `vector3` | Coat-layer shading normal |
+| `geometry_coat_tangent` | `vector3` | Coat-layer tangent        |
+
+This implementation replaces those four parameters with two pre-orthonormalized `OpenPBR_Basis` structs:
+
+| Struct field    | Encodes                                                                         |
+|-----------------|---------------------------------------------------------------------------------|
+| `shading_basis` | `geometry_normal`, `geometry_tangent`, and the derived bitangent                |
+| `coat_basis`    | `geometry_coat_normal`, `geometry_coat_tangent`, and the derived coat bitangent |
+
+Callers must supply orthonormalized bases. `openpbr_make_basis()` (in `openpbr_basis.h`) provides overloads that accept `(normal)`, `(normal, tangent, handedness)`, or `(normal, tangent, bitangent)` and perform orthonormalization via modified Gram–Schmidt.
+
+This representation is used because the BSDF performs numerous dot products, cross products, and coordinate-frame changes in local space. Storing a pre-orthonormalized frame eliminates repeated normalization inside the hot path and ensures the local frame is consistent across all lobes regardless of floating-point rounding in the caller's tangent computation.
+
+### 2. Anisotropy rotation: (cos θ, sin θ) extension (not in OpenPBR spec)
+
+OpenPBR 1.0 defines `specular_roughness_anisotropy` and `coat_roughness_anisotropy` (anisotropy magnitude in `[0, 1]`), but provides no rotation angle parameter. This implementation adds two optional extension fields:
+
+| Extension field                        | Type   | Default  | Description                                        |
+|----------------------------------------|--------|----------|----------------------------------------------------|
+| `specular_anisotropy_rotation_cos_sin` | `vec2` | `(1, 0)` | (cos θ, sin θ) of the specular anisotropy rotation |
+| `coat_anisotropy_rotation_cos_sin`     | `vec2` | `(1, 0)` | (cos θ, sin θ) of the coat anisotropy rotation     |
+
+Both default to `(1, 0)` = (cos 0°, sin 0°), which is a no-op equivalent to having no rotation at all. The vec2 does not need to be unit-length (as can happen after texture filtering); the BSDF normalizes the rotated tangent frame internally.
+
+This representation is used for two main reasons:
+
+1. **Texture-filtering correctness.** A scalar angle texture has a hard discontinuity at the 0°/360° wrap boundary: two texels that are nearly identical in angle would be filtered toward 180° across the seam. Storing (cos θ, sin θ) keeps both components smooth and continuous everywhere, so bilinear or trilinear filtering across that boundary produces the correct interpolated rotation.
+2. **Computational efficiency.** The BSDF uses the rotation directly as (cos, sin) to rotate the anisotropy tangent frame, so storing it in that form avoids a per-shading-point trig conversion from an angle representation.
+
+When sourcing rotation from a scalar angle (e.g., a material parameter rather than a texture), encode it with `vec2(cos(angle_radians), sin(angle_radians))`.
+
+---
+
 ## Contribution and Roadmap
 
 We welcome issues and pull requests, for example:
@@ -281,7 +338,7 @@ We welcome issues and pull requests, for example:
 Planned or potential future work:
 
 - Specialization constants currently cover four per-lobe feature toggles (`EnableSheenAndCoat`, `EnableDispersion`, `EnableTranslucency`, `EnableMetallic`), all defaulting to `true`; more may be added (e.g., for thin-film and thin-wall) to cover additional lobes
-- A transmission helper for translucent shadow rays exists internally but is not yet part of the public API
+- Emission API: `openpbr_compute_emission()` is available (see [High-Level Architecture](#high-level-architecture), item 5 above); promoting it to `openpbr_api.h` requires settling the entry-point shape: standalone function, cached field in `OpenPBR_PreparedBsdf` (simple but pays the coat/fuzz attenuation cost even when emission is unused), or a unified prepare-and-emit entry point
 - Reciprocity may be traded for better energy conservation in a future version
 - 1D texture sampler support: energy tables with a single dimension are currently stored as thin 2D textures (1 × N); using a real 1D sampler when the platform supports it would reduce sampler overhead
 - Implementing OpenPBR 1.2

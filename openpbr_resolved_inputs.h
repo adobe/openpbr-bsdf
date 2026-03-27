@@ -44,7 +44,7 @@ struct OpenPBR_ResolvedInputs
     float specular_roughness;
     float specular_roughness_anisotropy;
     float specular_ior;
-    // Optional extension (Eclair): anisotropy rotation in radians; set to (1, 0) if unused.
+    // Optional extension (Eclair): cosine and sine of the anisotropy rotation angle; set to (1, 0) if unused.
     vec2 specular_anisotropy_rotation_cos_sin;
 
     // Coat
@@ -54,7 +54,7 @@ struct OpenPBR_ResolvedInputs
     float coat_roughness_anisotropy;
     float coat_ior;
     float coat_darkening;
-    // Optional extension (Eclair): anisotropy rotation in radians; set to (1, 0) if unused.
+    // Optional extension (Eclair): cosine and sine of the anisotropy rotation angle; set to (1, 0) if unused.
     vec2 coat_anisotropy_rotation_cos_sin;
 
     // Fuzz
@@ -92,7 +92,7 @@ struct OpenPBR_ResolvedInputs
 };
 
 // Returns a fully initialized set of resolved inputs using the OpenPBR specification defaults.
-OpenPBR_ResolvedInputs openpbr_make_default_resolved_inputs()
+OPENPBR_INLINE_FUNCTION OpenPBR_ResolvedInputs openpbr_make_default_resolved_inputs()
 {
     OpenPBR_ResolvedInputs inputs;
 

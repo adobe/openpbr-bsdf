@@ -117,19 +117,19 @@ using vec4 = float4;
 #endif
 
 // Swizzle helpers.
-OPENPBR_INLINE_FUNCTION float2 openpbr_swizzle_xy(const float3 v)
+OPENPBR_INLINE_FUNCTION vec2 openpbr_swizzle_xy(const vec3 v)
 {
-    return float2{ v.x, v.y };
+    return vec2{ v.x, v.y };
 }
 
-OPENPBR_INLINE_FUNCTION float2 openpbr_swizzle_xy(const float4 v)
+OPENPBR_INLINE_FUNCTION vec2 openpbr_swizzle_xy(const vec4 v)
 {
-    return float2{ v.x, v.y };
+    return vec2{ v.x, v.y };
 }
 
-OPENPBR_INLINE_FUNCTION float3 openpbr_swizzle_xyz(const float4 v)
+OPENPBR_INLINE_FUNCTION vec3 openpbr_swizzle_xyz(const vec4 v)
 {
-    return float3{ v.x, v.y, v.z };
+    return vec3{ v.x, v.y, v.z };
 }
 
 #define OPENPBR_SWIZZLE(v, suffix) openpbr_swizzle_##suffix(v)

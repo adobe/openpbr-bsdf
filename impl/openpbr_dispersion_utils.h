@@ -29,7 +29,7 @@ OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthMedium_nm =
     OpenPBR_FraunhoferLine_d_nm;  // Abbe originally used D, but today d is more common.
 OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_DispersionWavelengthShort_nm = OpenPBR_FraunhoferLine_F_nm;
 
-// Converts OpenPBR "disperion" parameter to Abbe number V_d, the reciprocal of the relative mean dispersion:
+// Converts OpenPBR "dispersion" parameter to Abbe number V_d, the reciprocal of the relative mean dispersion:
 // V_d = (n_d - 1) / (n_F - n_C) (Abbe originally used D, but today d is more common). The mapping is
 // V_d = 20 / "dispersion". This maps all of the realistic glass Abbe numbers, which range from about
 // 20 to 95, into [0, 1], where 0 corresponds to no dispersion (infinite Abbe number) and 1 corresponds

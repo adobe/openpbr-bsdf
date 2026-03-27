@@ -71,36 +71,6 @@ vec2 openpbr_compute_anisotropic_alpha(const float isotropic_alpha,
     return anisotropic_alpha;
 }
 
-// Evaluate isotropic GGX.
-float openpbr_eval_iso_ggx(const float cos_theta, const float alpha)
-{
-    if (cos_theta <= 0.0f)
-        return 0.0f;
-    const float c2 = openpbr_square(cos_theta);
-    const float t2 = (1.0f - c2) / c2;
-    const float a2 = openpbr_square(alpha);
-    const float denom = OpenPBR_Pi * openpbr_square(c2) * openpbr_square(a2 + t2);
-    return a2 / denom;
-}
-
-// Sample NDF of isotropic GGX with Smith masking function.
-vec3 openpbr_sample_iso_ggx(const vec2 rand, const float alpha)
-{
-    const float theta = atan(alpha * openpbr_fast_sqrt(rand.x / (1.0f - rand.x)));
-    const float phi = OpenPBR_TwoPi * rand.y;
-    const float st = sin(theta);
-    const float ct = cos(theta);
-    const float sp = sin(phi);
-    const float cp = cos(phi);
-    return vec3(st * cp, st * sp, ct);
-}
-
-vec3 openpbr_sample_iso_ggx_world(const vec2 rand, const OpenPBR_Basis basis, const float alpha)
-{
-    const vec3 result = openpbr_sample_iso_ggx(rand, alpha);
-    return normalize(result.x * basis.t + result.y * basis.b + result.z * basis.n);
-}
-
 // Evaluate isotropic Smith shadowing or masking function.
 float openpbr_eval_iso_smith_g1(const float cos_theta, const float alpha)
 {
@@ -182,6 +152,8 @@ vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, 
 // Input vector is in local (z-up) space.
 float openpbr_eval_aniso_smith_g1(const vec3 v, const vec2 alpha)
 {
+    if (v.z <= 0.0f)
+        return 0.0f;
     const float lambda =
         (-1.0f + openpbr_fast_sqrt(1.0f + (openpbr_square(alpha.x) * openpbr_square(v.x) + openpbr_square(alpha.y) * openpbr_square(v.y)) /
                                               openpbr_square(v.z))) /
@@ -220,19 +192,6 @@ float openpbr_ior_from_f0(const float f0)
     return eta_t_over_eta_i;
 }
 
-// Adjusts the given IOR using the ASM-style "specular level" param.
-// When the "specular level" is 0.5, this function is a no-op.
-float openpbr_apply_specular_level_to_ior(const float eta_t_over_eta_i, const float specular_level)
-{
-    const float unscaled_f0 = openpbr_f0_from_ior(eta_t_over_eta_i);
-    const float scaled_f0 = unscaled_f0 * specular_level * 2.0f;
-    OPENPBR_CONSTEXPR_LOCAL float MaxF0 = 0.9999f;
-    const float clamped_scaled_f0 = min(scaled_f0, MaxF0);
-    const float external_ior = openpbr_ior_from_f0(clamped_scaled_f0);
-    const bool internal_reflection = eta_t_over_eta_i < 1.0f;
-    return internal_reflection ? 1.0f / external_ior : external_ior;
-}
-
 // Adjusts the given IOR using the OpenPBR "specular weight" param.
 // When the "specular weight" is 1.0, this function is a no-op.
 float openpbr_apply_specular_weight_to_ior(const float eta_t_over_eta_i, const float specular_weight)
@@ -252,31 +211,10 @@ vec3 openpbr_schlick(const float cos_theta, const vec3 f0)
     return f0 + (vec3(1.0f) - f0) * openpbr_fifth_power(1.0f - abs(cos_theta));
 }
 
-// Calculates Schlick Fresnel t reflectivity given scalar F0.
+// Calculates Schlick Fresnel reflectivity given scalar F0.
 float openpbr_schlick(const float cos_theta, const float f0)
 {
     return f0 + (1.0f - f0) * openpbr_fifth_power(1.0f - min(abs(cos_theta), 1.0f));
-}
-
-// Calculates Schlick Fresnel reflectivity adjusted to handle internal reflection.
-// eta_i is incoming medium's IOR, eta_t is transmitted medium's IOR, and the sign of cos_theta does not matter.
-float openpbr_schlick_with_tir(const float eta_t_over_eta_i, const float cos_theta)
-{
-    float adjusted_cos_theta = cos_theta;
-
-    if (eta_t_over_eta_i < 1.0f)
-    {
-        const float sin_t2 = (1.0f - openpbr_square(adjusted_cos_theta)) / openpbr_square(eta_t_over_eta_i);
-        if (sin_t2 > 1.0f)
-            return 1.0f;  // TIR
-
-        // The use of openpbr_fast_sqrt() here can lead to numerical issues
-        adjusted_cos_theta = sqrt(1.0f - sin_t2);
-    }
-
-    const float f0 = openpbr_f0_from_ior(eta_t_over_eta_i);
-
-    return openpbr_schlick(adjusted_cos_theta, f0);
 }
 
 // Calculates real unpolarized Fresnel reflectivity.
