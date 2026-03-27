@@ -23,7 +23,7 @@
 // Specify the type of lobe representing reflection from the coating.
 #include "openpbr_ior_reflection_coefficient.h"
 #include "openpbr_microfacet_multiple_scattering_data.h"
-#include "openpbr_vndf_microfacet_distributions.h"
+#include "openpbr_vndf_microfacet_distribution.h"
 #define OPENPBR_MICROFACET_DISTRIBUTION_TYPE OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution
 #define OPENPBR_REFLECTION_COEFFICIENT_TYPE OpenPBR_IorReflectionCoefficient
 #define OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE                                                                                                         \

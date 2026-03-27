@@ -71,24 +71,6 @@ vec2 openpbr_compute_anisotropic_alpha(const float isotropic_alpha,
     return anisotropic_alpha;
 }
 
-// Evaluate isotropic Smith shadowing or masking function.
-float openpbr_eval_iso_smith_g1(const float cos_theta, const float alpha)
-{
-    if (cos_theta <= 0.0f)
-        return 0.0f;
-    const float c2 = openpbr_square(cos_theta);
-    const float t2 = (1.0f - c2) / c2;
-    const float a2 = openpbr_square(alpha);
-    const float tmp = openpbr_fast_sqrt(1.0f + a2 * t2);
-    return 2.0f / (1.0f + tmp);
-}
-
-// Evaluate isotropic Smith shadowing and masking function.
-float openpbr_eval_iso_smith_g2(const float cos1, const float cos2, const float alpha)
-{
-    return openpbr_eval_iso_smith_g1(cos1, alpha) * openpbr_eval_iso_smith_g1(cos2, alpha);
-}
-
 // Evaluate anisotropic GGX.
 // Input vector is in local (z-up) space.
 float openpbr_eval_aniso_ggx(const vec3 n, const vec2 alpha)

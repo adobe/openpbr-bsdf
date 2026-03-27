@@ -24,7 +24,7 @@
 #include "openpbr_dispersion_utils.h"
 #include "openpbr_lobe_utils.h"
 #include "openpbr_specialization_constants.h"
-#include "openpbr_vndf_microfacet_distributions.h"
+#include "openpbr_vndf_microfacet_distribution.h"
 
 ///////////////////////////////////////////////////////
 // ComprehensiveMicrofacetReflectionTransmissionLobe //
