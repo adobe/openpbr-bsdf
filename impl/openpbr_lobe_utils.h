@@ -132,15 +132,19 @@ vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, 
 
 // Evaluate anisotropic Smith shadowing or masking function.
 // Input vector is in local (z-up) space.
+// Negative v.z is intentionally supported to accommodate transmission paths.
 float openpbr_eval_aniso_smith_g1(const vec3 v, const vec2 alpha)
 {
-    if (v.z == 0.0f)
+    // Guard against division by zero; underflow in the square automatically
+    // handles cases where v is near the tangent plane.
+    const float vz_squared = openpbr_square(v.z);
+    if (vz_squared == 0.0f)
         return 0.0f;
-    const float lambda =
-        (-1.0f + openpbr_fast_sqrt(1.0f + (openpbr_square(alpha.x) * openpbr_square(v.x) + openpbr_square(alpha.y) * openpbr_square(v.y)) /
-                                              openpbr_square(v.z))) /
-        2.0f;
-    return 1.0f / (1.0f + lambda);
+
+    // This uses an algebraically equivalent form of the Smith G1 function that
+    // avoids catastrophic cancellation in the intermediate Lambda computation,
+    // ensuring numerical stability when roughness or slopes are near zero.
+    return 2.0f / (1.0f + openpbr_fast_sqrt(1.0f + (openpbr_square(alpha.x * v.x) + openpbr_square(alpha.y * v.y)) / vz_squared));
 }
 
 // Evaluate anisotropic Smith non-correlated shadowing and masking function.
