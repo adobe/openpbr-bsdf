@@ -14,8 +14,8 @@
  * limitations under the License.
  ***************************************************************************/
 
-#ifndef CONSTANT_REFLECTION_COEFFICIENT_H
-#define CONSTANT_REFLECTION_COEFFICIENT_H
+#ifndef OPENPBR_CONSTANT_REFLECTION_COEFFICIENT_H
+#define OPENPBR_CONSTANT_REFLECTION_COEFFICIENT_H
 
 #include "openpbr_reflection_transmission_coefficient_structs.h"
 
@@ -93,4 +93,4 @@ float openpbr_estimate_weight_when_applied_to_ggx_microfacet_distribution(
     return openpbr_estimate_weight(refl_trans_coeff, path_throughput, idotn);
 }
 
-#endif  // !CONSTANT_REFLECTION_COEFFICIENT_H
+#endif  // !OPENPBR_CONSTANT_REFLECTION_COEFFICIENT_H

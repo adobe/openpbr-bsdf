@@ -44,7 +44,7 @@
 // CoatingLobe //
 /////////////////
 
-// Represents a coating layer and whatever is beneath it (a sheen layer in this case).
+// Represents a coating layer and whatever is beneath it (the aggregate base lobe in this case).
 // Handles energy balance between these layers in a reciprocal way.
 // When "inside" is true, represents a coated surface hit from the inside;
 // applies a tint but doesn't do much else.
@@ -55,7 +55,6 @@ struct OpenPBR_CoatingLobe_AggregateLobe
     vec3 normal_ff;
     vec3 tint;
     float presence;
-    vec3 sqrt_extra_base_layer_scale;
     bool inside;
 
     // Properties used only when entering the material (not when exiting).
@@ -71,12 +70,13 @@ vec3 openpbr_coat_passage_color_multiplier(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_
 {
     if (cosine > 0.0f && openpbr_min3(lobe.tint) < 1.0f)
     {
-        // The user-specified coat color is defined to be the square of the coat trasmission color
-        // at normal incidence, so taking the square root of the fractional_tint produces the coat
+        // The user-specified coat color is defined to be the square of the coat transmission color
+        // at normal incidence, so taking the square root of the tint produces the coat
         // transmission color at normal incidence (compensated for the presence of the coat).
         const vec3 coat_transmission_at_normal_incidence = sqrt(lobe.tint);
-        const float refracted_cosine = sqrt(1.0f - (1.0f - openpbr_square(cosine)) /
-                                                       openpbr_square(lobe.coat_reflection_lobe.refl_trans_coeff.eta_t_over_eta_i));  // Snell's law
+        const float refracted_cosine = sqrt(max(
+            0.0f,
+            1.0f - (1.0f - openpbr_square(cosine)) / openpbr_square(lobe.coat_reflection_lobe.refl_trans_coeff.eta_t_over_eta_i)));  // Snell's law
         const float distance_scale = 1.0f / refracted_cosine;  // passage distance relative to coat thickness in normal direction
         const vec3 coat_transmission_along_refracted_ray = openpbr_safe_pow(coat_transmission_at_normal_incidence, vec3(distance_scale));
         return mix(vec3(1.0f), coat_transmission_along_refracted_ray, lobe.presence);  // account for fractional coat coverage

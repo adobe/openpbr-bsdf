@@ -21,8 +21,8 @@
 #define OPENPBR_FUZZ_LOBE_H
 
 #include "../openpbr_constants.h"
-#include "../openpbr_diffuse_specular.h"
 #include "../openpbr_data_constants.h"
+#include "../openpbr_diffuse_specular.h"
 #include "openpbr_coating_lobe.h"
 #include "openpbr_lobe_utils.h"
 #include "openpbr_math.h"
@@ -58,11 +58,13 @@
 // reproduced the overall sheen look from explicit fibers that the authors were
 // going for. The ASM sheen lobe made similar choices.
 //
-// A reference implementation can be found at https://github.com/tizian/ltc-sheen
-// In the implementation below, the core Disney-sheen-specific functions are prefixed
-// with "disney_sheen_" and use the structure and variable names from the reference
-// implementation to make it easier to compare them. Direction vectors and calculations
-// in those functions are in the z-up local space.
+// The reference implementation by Tizian Zeltner, Brent Burley, and Matt Jen-Yuan Chiang
+// is available at https://github.com/tizian/ltc-sheen and is licensed under the
+// Apache License, Version 2.0. The core Disney-sheen-specific functions below are
+// derived from that reference: they are prefixed with "disney_sheen_" and use the
+// structure and variable names from the reference implementation to make it easier
+// to compare them. Direction vectors and calculations in those functions are in the
+// z-up local space.
 
 ////////////////////////////
 // DISNEY SHEEN LOBE DATA //
@@ -92,7 +94,7 @@ struct OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe
     float presence;  // the proportion of the microsurface covered by the sheen
 
     OpenPBR_Basis basis;   // a basis aligned with the normal and oriented according to the view direction
-    vec3 view_dir_lsn;     // the view direction in the z-up local space of the basis
+    vec3 view_dir_local;   // the view direction in the z-up local space of the basis
     float view_reflected;  // overall proportion of light reflected by the sheen lobe for the given view direction
 };
 
@@ -123,7 +125,7 @@ vec3 openpbr_disney_sheen_rotate_vector(const vec3 v, const vec3 axis, const flo
 //////////////////////////////////////////////////////
 
 // Evaluate the LTC distribution in its default coordinate system.
-float openpbr_disney_sheen_eval_ltc(const vec3 wi_lsn, const vec3 ltc_coeffs)
+float openpbr_disney_sheen_eval_ltc(const vec3 wi_local, const vec3 ltc_coeffs)
 {
     // The (inverse) transform matrix "M^{-1}" is given by:
     //
@@ -132,11 +134,11 @@ float openpbr_disney_sheen_eval_ltc(const vec3 wi_lsn, const vec3 ltc_coeffs)
     //               [0    0    1     ]]
     //
     // with "a_inv = ltc_coeffs[0]", "b_inv = ltc_coeffs[1]" fetched from the
-    // table. The transformed direction "wi_original_lsn" is therefore:
+    // table. The transformed direction "wi_original_local" is therefore:
     //
-    //                                        [[a_inv * wi_lsn.x + b_inv * wi_lsn.z]
-    //     wi_original_lsn = M^{-1} * wi_lsn = [a_inv * wi_lsn.y                   ]
-    //                                         [wi_lsn.z                           ]]
+    //                                            [[a_inv * wi_local.x + b_inv * wi_local.z]
+    //     wi_original_local = M^{-1} * wi_local = [a_inv * wi_local.y                     ]
+    //                                             [wi_local.z                             ]]
     //
     // which is subsequently normalized. The determinant of the matrix is:
     //
@@ -149,14 +151,14 @@ float openpbr_disney_sheen_eval_ltc(const vec3 wi_lsn, const vec3 ltc_coeffs)
 
     const float a_inv = ltc_coeffs[0];
     const float b_inv = ltc_coeffs[1];
-    vec3 wi_original_lsn = vec3(a_inv * wi_lsn.x + b_inv * wi_lsn.z, a_inv * wi_lsn.y, wi_lsn.z);
-    const float len = length(wi_original_lsn);
-    wi_original_lsn /= len;
+    vec3 wi_original_local = vec3(a_inv * wi_local.x + b_inv * wi_local.z, a_inv * wi_local.y, wi_local.z);
+    const float len = length(wi_original_local);
+    wi_original_local /= len;
 
     const float det = a_inv * a_inv;
     const float jacobian = det / (len * len * len);
 
-    return openpbr_compute_pdf_for_sample_unit_hemisphere_cosine(wi_original_lsn) * jacobian;
+    return openpbr_compute_pdf_for_sample_unit_hemisphere_cosine(wi_original_local) * jacobian;
 }
 
 // Sample from the LTC distribution in its default coordinate system.
@@ -175,28 +177,28 @@ vec3 openpbr_disney_sheen_sample_ltc(const vec3 ltc_coeffs, const vec2 rand)
     //     M =  [0      1/a_inv  0          ]
     //          [0      0       1           ]]
     //
-    // and the transformed direction wi_lsn is:
+    // and the transformed direction wi_local is:
     //
-    //                                   [[wi_original_lsn.x/a_inv - wi_original_lsn.z*b_inv/a_inv]
-    //     wi_lsn = M * wi_original_lsn = [wi_original_lsn.y/a_inv                                ]
-    //                                    [wi_original_lsn.z                                      ]]
+    //                                       [[wi_original_local.x/a_inv - wi_original_local.z*b_inv/a_inv]
+    //     wi_local = M * wi_original_local = [wi_original_local.y/a_inv                                  ]
+    //                                        [wi_original_local.z                                        ]]
     //
     // which is subsequently normalized.
     //
     // See the original paper [Heitz et al. 2016] for details about the LTC itself.
 
-    const vec3 wi_original_lsn = openpbr_sample_unit_hemisphere_cosine(rand);
+    const vec3 wi_original_local = openpbr_sample_unit_hemisphere_cosine(rand);
 
     const float a_inv = ltc_coeffs[0];
     const float b_inv = ltc_coeffs[1];
     const float a = 1.0f / a_inv;
-    const vec3 wi_lsn = vec3(wi_original_lsn.x * a - wi_original_lsn.z * b_inv * a, wi_original_lsn.y * a, wi_original_lsn.z);
-    return normalize(wi_lsn);
+    const vec3 wi_local = vec3(wi_original_local.x * a - wi_original_local.z * b_inv * a, wi_original_local.y * a, wi_original_local.z);
+    return normalize(wi_local);
 }
 
 // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
 vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                                       const vec3 direction_lsn)
+                                       const vec3 direction_local)
 {
     // LTC coefficients are stored in a table parameterized by these variables:
     //
@@ -215,7 +217,7 @@ vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONS
     OPENPBR_CONSTEXPR_LOCAL vec2 uv_max =
         vec2(float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize), float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize));
     OPENPBR_CONSTEXPR_LOCAL vec2 uv_step = vec2(0.5f / float(OpenPBR_LTCTableSize), 0.5f / float(OpenPBR_LTCTableSize));
-    const vec2 uv = vec2(openpbr_get_cos_theta_ls(direction_lsn), lobe.alpha) * uv_max + uv_step;
+    const vec2 uv = vec2(openpbr_get_cos_theta_local(direction_local), lobe.alpha) * uv_max + uv_step;
     return OPENPBR_SWIZZLE(OPENPBR_SAMPLE_2D_TEXTURE(OpenPBR_LutId_LTC, uv), xyz);
 #else
     // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
@@ -223,7 +225,7 @@ vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONS
 
     // Compute table indices and interpolation factors.
     const float row = max(0.0f, min(lobe.alpha, OpenPBR_LargestFloatBelowOne)) * float(OpenPBR_LTCTableSize - 1);
-    const float col = max(0.0f, min(openpbr_get_cos_theta_ls(direction_lsn), OpenPBR_LargestFloatBelowOne)) * float(OpenPBR_LTCTableSize - 1);
+    const float col = max(0.0f, min(openpbr_get_cos_theta_local(direction_local), OpenPBR_LargestFloatBelowOne)) * float(OpenPBR_LTCTableSize - 1);
     const float r = floor(row);
     const float c = floor(col);
     const float rf = row - r;
@@ -253,21 +255,21 @@ vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONS
 
 // Evaluate the BRDF.
 vec3 openpbr_disney_sheen_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                            const vec3 wo_lsn,
-                            const vec3 wi_lsn)
+                            const vec3 wo_local,
+                            const vec3 wi_local)
 {
-    const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn);
-    const float cos_theta_i = openpbr_get_cos_theta_ls(wi_lsn);
+    const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
+    const float cos_theta_i = openpbr_get_cos_theta_local(wi_local);
     if (cos_theta_o < 0.0f || cos_theta_i < 0.0f)
         return vec3(0.0f);
 
-    // Rotate coordinate frame to align with incident direction wo_lsn.
-    const float phi_std = openpbr_disney_sheen_phi(wo_lsn);
-    const vec3 wi_std_lsn = openpbr_disney_sheen_rotate_vector(wi_lsn, vec3(0.0f, 0.0f, 1.0f), -phi_std);
+    // Rotate coordinate frame to align with incident direction wo_local.
+    const float phi_std = openpbr_disney_sheen_phi(wo_local);
+    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec3(0.0f, 0.0f, 1.0f), -phi_std);
 
     // Evaluate LTC distribution in aligned coordinates.
-    const vec3 ltc_coeffs = openpbr_disney_sheen_fetch_coeffs(lobe, wo_lsn);
-    vec3 value = vec3(openpbr_disney_sheen_eval_ltc(wi_std_lsn, ltc_coeffs));
+    const vec3 ltc_coeffs = openpbr_disney_sheen_fetch_coeffs(lobe, wo_local);
+    vec3 value = vec3(openpbr_disney_sheen_eval_ltc(wi_std_local, ltc_coeffs));
 
     // Also consider the presence (surface coverage), overall reflectance ("R" in the paper),
     // and artist-specified sheen tint ("Csheen" in the paper).
@@ -293,24 +295,24 @@ vec3 openpbr_disney_sheen_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
 // Returns whether a valid sample was successfully generated.
 bool openpbr_disney_sheen_sample_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                    const vec2 rand,
-                                   const vec3 wo_lsn,
-                                   OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) wi_lsn)
+                                   const vec3 wo_local,
+                                   OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) wi_local)
 {
-    const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn);
+    const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
     if (cos_theta_o < 0.0f)
     {
-        wi_lsn = vec3(0.0f);
+        wi_local = vec3(0.0f);
         return false;
     }
 
     // Sample from the LTC distribution in aligned coordinates.
-    const vec3 wi_std_lsn = openpbr_disney_sheen_sample_ltc(openpbr_disney_sheen_fetch_coeffs(lobe, wo_lsn), rand);
+    const vec3 wi_std_local = openpbr_disney_sheen_sample_ltc(openpbr_disney_sheen_fetch_coeffs(lobe, wo_local), rand);
 
-    // Rotate coordinate frame based on incident direction wo_lsn.
-    const float phi_std = openpbr_disney_sheen_phi(wo_lsn);
-    wi_lsn = openpbr_disney_sheen_rotate_vector(wi_std_lsn, vec3(0.0f, 0.0f, 1.0f), +phi_std);
+    // Rotate coordinate frame based on incident direction wo_local.
+    const float phi_std = openpbr_disney_sheen_phi(wo_local);
+    wi_local = openpbr_disney_sheen_rotate_vector(wi_std_local, vec3(0.0f, 0.0f, 1.0f), +phi_std);
 
-    if (!openpbr_are_in_same_hemisphere_ls(wo_lsn, wi_lsn))
+    if (!openpbr_are_in_same_hemisphere_local(wo_local, wi_local))
         return false;
 
     return true;
@@ -318,19 +320,19 @@ bool openpbr_disney_sheen_sample_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
 
 // Sampling density associated with the "disney_sheen_sample_f" function above. Used for MIS.
 float openpbr_disney_sheen_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                               const vec3 wo_lsn,
-                               const vec3 wi_lsn)
+                               const vec3 wo_local,
+                               const vec3 wi_local)
 {
-    const float cos_theta_o = openpbr_get_cos_theta_ls(wo_lsn), cos_theta_i = openpbr_get_cos_theta_ls(wi_lsn);
+    const float cos_theta_o = openpbr_get_cos_theta_local(wo_local), cos_theta_i = openpbr_get_cos_theta_local(wi_local);
     if (cos_theta_o < 0.0f || cos_theta_i < 0.0f)
         return 0.0f;
 
-    // Rotate coordinate frame to align with incident direction wo_lsn.
-    const float phi_std = openpbr_disney_sheen_phi(wo_lsn);
-    const vec3 wi_std_lsn = openpbr_disney_sheen_rotate_vector(wi_lsn, vec3(0.0f, 0.0f, 1.0f), -phi_std);
+    // Rotate coordinate frame to align with incident direction wo_local.
+    const float phi_std = openpbr_disney_sheen_phi(wo_local);
+    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec3(0.0f, 0.0f, 1.0f), -phi_std);
 
     // Evaluate LTC distribution in aligned coordinates.
-    return openpbr_disney_sheen_eval_ltc(wi_std_lsn, openpbr_disney_sheen_fetch_coeffs(lobe, wo_lsn));
+    return openpbr_disney_sheen_eval_ltc(wi_std_local, openpbr_disney_sheen_fetch_coeffs(lobe, wo_local));
 }
 
 ///////////////////////////////////////////////////////////
@@ -338,7 +340,7 @@ float openpbr_disney_sheen_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(Op
 ///////////////////////////////////////////////////////////
 
 float openpbr_proportion_reflected(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                                   const vec3 direction_lsn)
+                                   const vec3 direction_local)
 {
     // The implementation of this function uses the conventions of the core Disney sheen functions.
     //
@@ -346,12 +348,12 @@ float openpbr_proportion_reflected(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
     // the base layer is always visible to some extent. This makes sense because the sheen
     // is based on a volume of finite density and thickness.
 
-    const float cos_theta = openpbr_get_cos_theta_ls(direction_lsn);
+    const float cos_theta = openpbr_get_cos_theta_local(direction_local);
     if (cos_theta < 0.0f)
         return 0.0f;
 
     // The third component of each of the items in the LTC LUT is the overall reflectance ("R" in the paper).
-    const vec3 ltc_coeffs = openpbr_disney_sheen_fetch_coeffs(lobe, direction_lsn);
+    const vec3 ltc_coeffs = openpbr_disney_sheen_fetch_coeffs(lobe, direction_local);
     const float r = ltc_coeffs[2];
     return lobe.presence * r;
 }
@@ -362,17 +364,17 @@ float openpbr_base_layer_scale_incoming(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CON
 }
 
 float openpbr_base_layer_scale_outgoing(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                                        const vec3 light_direction_lsn)
+                                        const vec3 light_direction_local)
 {
-    const float light_reflected = openpbr_proportion_reflected(lobe, light_direction_lsn);
+    const float light_reflected = openpbr_proportion_reflected(lobe, light_direction_local);
     return 1.0f - light_reflected;
 }
 
 float openpbr_base_layer_scale_complete(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                                        const vec3 light_direction_lsn)
+                                        const vec3 light_direction_local)
 {
     const float incoming = openpbr_base_layer_scale_incoming(lobe);
-    const float outgoing = openpbr_base_layer_scale_outgoing(lobe, light_direction_lsn);
+    const float outgoing = openpbr_base_layer_scale_outgoing(lobe, light_direction_local);
     return incoming * outgoing;
 }
 
@@ -396,8 +398,8 @@ float openpbr_sheen_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(O
 
 // Assumes that child lobe has already been initialized.
 void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
-                             const vec3 normal_ff_wsn,
-                             const vec3 view_direction_wsn,
+                             const vec3 normal_ff,
+                             const vec3 view_direction,
                              const float roughness,
                              const vec3 tint,
                              const float presence)
@@ -407,9 +409,9 @@ void openpbr_initialize_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_
     lobe.tint = tint;
     lobe.presence = presence;
 
-    lobe.basis = openpbr_make_basis(normal_ff_wsn);
-    lobe.view_dir_lsn = openpbr_world_to_local(lobe.basis, view_direction_wsn);
-    lobe.view_reflected = openpbr_proportion_reflected(lobe, lobe.view_dir_lsn);
+    lobe.basis = openpbr_make_basis(normal_ff);
+    lobe.view_dir_local = openpbr_world_to_local(lobe.basis, view_direction);
+    lobe.view_reflected = openpbr_proportion_reflected(lobe, lobe.view_dir_local);
 }
 
 OpenPBR_BsdfLobeType openpbr_get_lobe_type(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe)
@@ -423,10 +425,10 @@ OpenPBR_DiffuseSpecular openpbr_calculate_lobe_value(OPENPBR_ADDRESS_SPACE_THREA
 {
     const OpenPBR_DiffuseSpecular base_value = openpbr_calculate_lobe_value(lobe.coating_lobe, view_direction, light_direction);
 
-    const vec3 light_dir_lsn = openpbr_world_to_local(lobe.basis, light_direction);
-    const vec3 sheen_value = openpbr_disney_sheen_f(lobe, lobe.view_dir_lsn, light_dir_lsn);
+    const vec3 light_dir_local = openpbr_world_to_local(lobe.basis, light_direction);
+    const vec3 sheen_value = openpbr_disney_sheen_f(lobe, lobe.view_dir_local, light_dir_local);
 
-    return openpbr_add_diffuse_specular(openpbr_scale_diffuse_specular(base_value, openpbr_base_layer_scale_complete(lobe, light_dir_lsn)),
+    return openpbr_add_diffuse_specular(openpbr_scale_diffuse_specular(base_value, openpbr_base_layer_scale_complete(lobe, light_dir_local)),
                                         openpbr_make_diffuse_specular_from_specular(sheen_value));
 }
 
@@ -436,8 +438,8 @@ float openpbr_calculate_lobe_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(
 {
     const float base_pdf = openpbr_calculate_lobe_pdf(lobe.coating_lobe, view_direction, light_direction);
 
-    const vec3 light_dir_lsn = openpbr_world_to_local(lobe.basis, light_direction);
-    const float sheen_pdf = openpbr_disney_sheen_pdf(lobe, lobe.view_dir_lsn, light_dir_lsn);
+    const vec3 light_dir_local = openpbr_world_to_local(lobe.basis, light_direction);
+    const float sheen_pdf = openpbr_disney_sheen_pdf(lobe, lobe.view_dir_local, light_dir_local);
 
     const float sheen_prob = openpbr_sheen_probability(lobe, view_direction);
 
@@ -468,17 +470,17 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
         //     rand_x /= sheen_prob;
         //     clamp_remapped_random_number(rand_x);
 
-        vec3 light_dir_lsn;
-        const bool success = openpbr_disney_sheen_sample_f(lobe, vec2(rand.y, rand.z), lobe.view_dir_lsn, light_dir_lsn);
+        vec3 light_dir_local;
+        const bool success = openpbr_disney_sheen_sample_f(lobe, vec2(rand.y, rand.z), lobe.view_dir_local, light_dir_local);
         if (!success)
         {
             openpbr_clear_lobe_sampling_output(light_direction, weight, pdf, sampled_type);
             return false;
         }
 
-        light_direction = openpbr_local_to_world(lobe.basis, light_dir_lsn);
+        light_direction = openpbr_local_to_world(lobe.basis, light_dir_local);
 
-        pdf = openpbr_disney_sheen_pdf(lobe, lobe.view_dir_lsn, light_dir_lsn) * sheen_prob;
+        pdf = openpbr_disney_sheen_pdf(lobe, lobe.view_dir_local, light_dir_local) * sheen_prob;
         pdf += openpbr_calculate_lobe_pdf(lobe.coating_lobe, view_direction, light_direction) *
                base_prob;  // The returned pdf takes both lobes into account.
 
@@ -501,23 +503,24 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
         if (!success)
             return false;
 
-        const vec3 light_dir_lsn = openpbr_world_to_local(lobe.basis, light_direction);
+        const vec3 light_dir_local = openpbr_world_to_local(lobe.basis, light_direction);
 
         if (!bool(sampled_type & OpenPBR_BsdfLobeTypeSpecular))  // non-delta
         {
             OpenPBR_DiffuseSpecular bsdf_cos = openpbr_scale_diffuse_specular(weight, pdf);
-            bsdf_cos = openpbr_scale_diffuse_specular(bsdf_cos, openpbr_base_layer_scale_complete(lobe, light_dir_lsn));
-            const vec3 sheen = openpbr_disney_sheen_f(lobe, lobe.view_dir_lsn, light_dir_lsn);
+            bsdf_cos = openpbr_scale_diffuse_specular(bsdf_cos, openpbr_base_layer_scale_complete(lobe, light_dir_local));
+            const vec3 sheen = openpbr_disney_sheen_f(lobe, lobe.view_dir_local, light_dir_local);
             bsdf_cos = openpbr_add_diffuse_specular(bsdf_cos, openpbr_make_diffuse_specular_from_specular(sheen));
 
             pdf *= base_prob;
-            pdf += openpbr_disney_sheen_pdf(lobe, lobe.view_dir_lsn, light_dir_lsn) * sheen_prob;  // The returned pdf takes both lobes into account.
+            pdf +=
+                openpbr_disney_sheen_pdf(lobe, lobe.view_dir_local, light_dir_local) * sheen_prob;  // The returned pdf takes both lobes into account.
 
             weight = openpbr_scale_diffuse_specular(bsdf_cos, 1.0f / pdf);  // The returned weight takes both lobes into account.
         }
         else  // delta
         {
-            weight = openpbr_scale_diffuse_specular(weight, openpbr_base_layer_scale_complete(lobe, light_dir_lsn) * reciprocal_base_prob);
+            weight = openpbr_scale_diffuse_specular(weight, openpbr_base_layer_scale_complete(lobe, light_dir_local) * reciprocal_base_prob);
         }
     }
 

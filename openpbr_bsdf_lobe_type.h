@@ -31,7 +31,7 @@ OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeSpecular = 1 <
 OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeVolume = 1 << 5;
 
 // Swap reflection and transmission in the OpenPBR_BsdfLobeType bitmask.
-OpenPBR_BsdfLobeType openpbr_swap_reflect_trans_flags(OpenPBR_BsdfLobeType bsdf_lobe_type)
+OPENPBR_INLINE_FUNCTION OpenPBR_BsdfLobeType openpbr_swap_reflect_trans_flags(OpenPBR_BsdfLobeType bsdf_lobe_type)
 {
     const bool has_r = bool(bsdf_lobe_type & OpenPBR_BsdfLobeTypeReflection);
     const bool has_t = bool(bsdf_lobe_type & OpenPBR_BsdfLobeTypeTransmission);

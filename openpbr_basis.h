@@ -45,7 +45,7 @@ OPENPBR_INLINE_FUNCTION OpenPBR_Basis openpbr_make_basis(const vec3 normal)
     OpenPBR_Basis basis;
     basis.n = normal;
 
-    // The code below uses the algorithm from "Building an Orthonormal OpenPBR_Basis, Revisited"
+    // The code below uses the algorithm from "Building an Orthonormal Basis, Revisited"
     // (http://jcgt.org/published/0006/01/01/).
 
     const float nz_sign = basis.n.z < 0.0f ? -1.0f : 1.0f;

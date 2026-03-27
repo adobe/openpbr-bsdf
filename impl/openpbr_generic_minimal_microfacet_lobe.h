@@ -126,7 +126,7 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OPENPBR_
 {
     const float idotn = dot(view_direction, lobe.normal_ff);
 
-    // Choose microfacet normal_ff (in world space).
+    // Choose microfacet normal_ff (in the caller's coordinate space).
     const vec3 half_vector = openpbr_sample_ggx_smith_vndf(lobe.microfacet_distr, view_direction, lobe.normal_ff, OPENPBR_SWIZZLE(rand, xy));
 
     const float idoth = dot(view_direction, half_vector);

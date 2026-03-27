@@ -37,10 +37,10 @@
 #endif
 
 // clang-format off
-OPENPBR_INLINE_FUNCTION float openpbr_fast_rcp_sqrt(const float x)                  { return OPENPBR_FAST_RCP_SQRT(x); }
-OPENPBR_INLINE_FUNCTION float openpbr_fast_sqrt(const float x)                      { return OPENPBR_FAST_SQRT(x); }
-OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_sqrt(const vec3 v)                       { return vec3(OPENPBR_FAST_SQRT(v.x), OPENPBR_FAST_SQRT(v.y), OPENPBR_FAST_SQRT(v.z)); }
-OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_normalize(const vec3 v)                  { return OPENPBR_FAST_NORMALIZE(v); }
+OPENPBR_INLINE_FUNCTION float openpbr_fast_rcp_sqrt(const float x) { return OPENPBR_FAST_RCP_SQRT(x); }
+OPENPBR_INLINE_FUNCTION float openpbr_fast_sqrt(const float x)     { return OPENPBR_FAST_SQRT(x); }
+OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_sqrt(const vec3 v)      { return vec3(OPENPBR_FAST_SQRT(v.x), OPENPBR_FAST_SQRT(v.y), OPENPBR_FAST_SQRT(v.z)); }
+OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_normalize(const vec3 v) { return OPENPBR_FAST_NORMALIZE(v); }
 // clang-format on
 
 OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_square(const float x)
@@ -55,17 +55,20 @@ OPENPBR_LIMITED_CONSTEXPR_FUNCTION vec3 openpbr_square(const vec3 v)
 
 OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_fourth_power(const float x)
 {
-    return x * x * x * x;
+    const float xx = x * x;
+    return xx * xx;
 }
 
 OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_fifth_power(const float x)
 {
-    return x * x * x * x * x;
+    const float xx = x * x;
+    return xx * xx * x;
 }
 
 OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_sixth_power(const float x)
 {
-    return x * x * x * x * x * x;
+    const float xx = x * x;
+    return xx * xx * xx;
 }
 
 OPENPBR_LIMITED_CONSTEXPR_FUNCTION float openpbr_min3(const vec3 v)
@@ -78,9 +81,9 @@ OPENPBR_LIMITED_CONSTEXPR_FUNCTION float openpbr_max3(const vec3 v)
     return max(max(v.x, v.y), v.z);
 }
 
-OPENPBR_INLINE_FUNCTION float openpbr_get_cos_theta_ls(const vec3 direction_lsn)
+OPENPBR_INLINE_FUNCTION float openpbr_get_cos_theta_local(const vec3 direction_local)
 {
-    return direction_lsn.z;
+    return direction_local.z;
 }
 
 OPENPBR_INLINE_FUNCTION float openpbr_sign_nonzero(const float x)
@@ -132,9 +135,9 @@ OPENPBR_INLINE_FUNCTION vec3 openpbr_safe_pow(const vec3 a, const vec3 b)
 }
 
 // Assuming a z-up local space, returns whether two directions are in the same hemisphere.
-OPENPBR_INLINE_FUNCTION bool openpbr_are_in_same_hemisphere_ls(const vec3 direction_lsn, const vec3 other_direction_lsn)
+OPENPBR_INLINE_FUNCTION bool openpbr_are_in_same_hemisphere_local(const vec3 direction_local, const vec3 other_direction_local)
 {
-    return direction_lsn.z * other_direction_lsn.z > 0.0f;
+    return direction_local.z * other_direction_local.z > 0.0f;
 }
 
 OPENPBR_INLINE_FUNCTION float openpbr_fourth_root(const float x)

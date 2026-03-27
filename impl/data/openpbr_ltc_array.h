@@ -22,14 +22,14 @@
 
 #include "../../openpbr_data_constants.h"
 
-// ==================================================================================
+// ================================================================================================================
 // Linearly Transformed Cosines (LTC) Lookup Table
-// ==================================================================================
+// ================================================================================================================
 //
-// This table contains precomputed LTC coefficients for the Disney sheen
-// (fuzz) model. The data comes from the Disney reference implementation:
-// ==================================================================================
-// https://github.com/tizian/ltc-sheen/blob/master/pbrt-v3/src/materials/sheenltc.cpp
+// This table contains precomputed LTC coefficients for the Disney sheen (fuzz) model. The data is reproduced from:
+//     https://github.com/tizian/ltc-sheen/blob/master/pbrt-v3/src/materials/sheenltc.cpp
+// by Tizian Zeltner, Brent Burley, and Matt Jen-Yuan Chiang, licensed under the Apache License, Version 2.0:
+//     https://github.com/tizian/ltc-sheen/blob/master/LICENSE
 //
 // The table is parameterized by:
 //   - Elevation angle (as cos(theta)) - horizontal axis
@@ -42,7 +42,7 @@
 //
 // Total size: 1024 vec3 entries = 3072 floats
 //
-// ==================================================================================
+// ================================================================================================================
 
 OPENPBR_CONSTEXPR_GLOBAL vec3 OpenPBR_LTC_Array[OpenPBR_LTCTableSize * OpenPBR_LTCTableSize] = {
 #include "openpbr_ltc_data.h"

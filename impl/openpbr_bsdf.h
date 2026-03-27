@@ -263,8 +263,12 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     const bool back_facing = cos_theta < 0.0f;
     const bool inside = back_facing && !resolved_inputs.geometry_thin_walled;  // if thin-walled, we always hit from the outside
 
-    // Calculate normals
-    // Also calculate TBN bases usable for anisotropic specular reflections.
+    // Calculate normals and TBN bases usable for anisotropic specular reflections.
+    // The "_ff" suffix (for "forward-facing" or "face-forwarded") marks normals and bases
+    // that have been conditionally flipped to always be in the same hemisphere as the view
+    // direction. This ensures that dot products, hemisphere tests, and lobe initialization
+    // work correctly regardless of whether the surface is hit from the front or the back,
+    // without special-casing throughout the shading code.
 
     // Set up normal_ff, the forward-facing version of the shading normal.
     OpenPBR_Basis specular_anisotropy_basis_ff = resolved_inputs.shading_basis;
@@ -878,6 +882,70 @@ float openpbr_pdf_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Pr
                : openpbr_calculate_lobe_pdf(prepared.fuzz_lobe.coating_lobe.base_lobe, prepared.view_direction, light_direction);
 }
 
+// Computes the emission that exits the surface after passing through the coat and fuzz layers.
+//
+// Reads emission_luminance and emission_color from resolved_inputs and scales by the
+// transmittance of the coat and fuzz layers as seen from the view direction used during
+// openpbr_prepare_lobes(). Both fields must be populated in resolved_inputs before calling
+// (openpbr_make_default_resolved_inputs() sets emission_luminance = 0 so default inputs
+// produce zero emission). openpbr_prepare_lobes() or openpbr_prepare_bsdf_and_volume()
+// must also have been called first so that the coat and fuzz lobes in "prepared" are ready.
+//
+// Returns emission in nits (cd/m²) per the OpenPBR specification. Coat attenuation is
+// wavelength-dependent (vec3); fuzz attenuation is achromatic (scalar). Respects the
+// EnableSheenAndCoat specialization constant.
+//
+// Renderers that do not work in physical units must scale the result before accumulating.
+// E.g., a renderer where 1.0 = 1000 nits should multiply the result by 0.001.
+//
+// Note: emission is a first-class output of the OpenPBR model and must be obtained by
+// calling this function — reading emission_luminance * emission_color directly from
+// resolved_inputs bypasses the coat and fuzz attenuation. Unlike translucent shadows
+// (an integrator-level approximation), this is a candidate for promotion to openpbr_api.h;
+// see README.md for the open design decisions.
+vec3 openpbr_compute_emission(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
+                              OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared)
+{
+    vec3 result = resolved_inputs.emission_luminance * resolved_inputs.emission_color;
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat))
+    {
+        // Coat absorption is wavelength-dependent; scale by the vec3 coat transmittance.
+        if (resolved_inputs.coat_weight > 0.0f)
+            result *= openpbr_base_layer_scale_incoming(prepared.fuzz_lobe.coating_lobe);
+
+        // Fuzz transmittance is achromatic; scale by the scalar fuzz transmittance.
+        if (resolved_inputs.fuzz_weight > 0.0f)
+            result *= vec3(openpbr_base_layer_scale_incoming(prepared.fuzz_lobe));
+    }
+    return result;
+}
+
+// Computes the probability and color weight for a biased straight-through shadow ray.
+//
+// Tracing unbiased refractive shadow paths through transmissive or subsurface-scattering
+// materials is expensive and produces difficult-to-sample caustics. This function enables
+// a practical approximation: a shadow ray passes straight through the surface with a given
+// probability, weighted by Fresnel reflectance, coat tinting, and instantaneous transmission
+// absorption. The unbiased complement is handled by the full path-tracing integrator.
+//
+// The hit surface's own roughness is already factored in: rough transmissive surfaces
+// return a lower probability (approaching zero at roughness 1), at which point direct
+// light sampling by the path tracer is more effective than the approximation. The
+// probability can additionally be scaled by a weight derived from the roughness of the
+// originating scattering event to further suppress the approximation when the path tracer
+// can find the caustic efficiently (e.g., near-specular origin) and lean on it more when
+// it cannot (e.g., diffuse or rough-specular origin).
+//
+// Returns vec4(weight.xyz, probability):
+//   weight.xyz   - color transmittance to apply to the shadow ray throughput
+//   probability  - material's straight-through probability (before roughness scaling);
+//                  0 for fully opaque materials (early-out; weight is undefined)
+//
+// cos_theta = dot(surface_normal, shadow_ray_direction); positive = front side.
+//
+// Preconditions:
+//   - openpbr_prepare_volume() must have been called to populate volume_derived_props.
+//   - resolved_inputs must be fully populated.
 vec4 openpbr_translucent_shadow_weight_and_prob(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
                                                 OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_VolumeDerivedProps) volume_derived_props,
                                                 const float cos_theta)
