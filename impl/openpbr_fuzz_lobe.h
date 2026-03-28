@@ -388,7 +388,8 @@ float openpbr_sheen_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(O
     //       either by saving it in the lobe struct or by passing it in.
     OPENPBR_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
 
-    const float sheen_contribution = lobe.view_reflected * lobe.presence * openpbr_max3(lobe.tint);
+    // lobe.view_reflected is already weighted by lobe.presence; see openpbr_proportion_reflected().
+    const float sheen_contribution = lobe.view_reflected * openpbr_max3(lobe.tint);
 
     const float unscaled_base_lobe_contribution = openpbr_estimate_lobe_contribution(lobe.coating_lobe, view_direction, PlaceholderPathThroughput);
     const float scaled_base_lobe_contribution = unscaled_base_lobe_contribution * openpbr_base_layer_scale_incoming(lobe);
@@ -531,7 +532,9 @@ float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CO
                                          const vec3 view_direction,
                                          const vec3 path_throughput)
 {
-    return openpbr_max_component_of_throughput_weighted_color(path_throughput, lobe.view_reflected * lobe.presence * lobe.tint) +
+    // Note that presence isn't explicitly included below because lobe.view_reflected is already
+    // weighted by lobe.presence; see openpbr_proportion_reflected().
+    return openpbr_max_component_of_throughput_weighted_color(path_throughput, lobe.view_reflected * lobe.tint) +
            openpbr_estimate_lobe_contribution(lobe.coating_lobe, view_direction, path_throughput) * openpbr_base_layer_scale_incoming(lobe);
 }
 
