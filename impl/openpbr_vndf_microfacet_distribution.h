@@ -14,8 +14,8 @@
  * limitations under the License.
  ***************************************************************************/
 
-#ifndef OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H
-#define OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H
+#ifndef OPENPBR_VNDF_MICROFACET_DISTRIBUTION_H
+#define OPENPBR_VNDF_MICROFACET_DISTRIBUTION_H
 
 #include "../openpbr_basis.h"
 #include "openpbr_lobe_utils.h"
@@ -86,62 +86,4 @@ float openpbr_get_isotropic_alpha(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF
     return microfacet_distr.isotropic_alpha;
 }
 
-/////////////////////////////////////////////////
-// IsotropicGGXSmithVNDFMicrofacetDistribution //
-/////////////////////////////////////////////////
-
-struct OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution
-{
-    float alpha;
-};
-
-vec3 openpbr_sample_ggx_smith_vndf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution)
-                                       microfacet_distr,
-                                   const vec3 view_direction,
-                                   const vec3 normal_ff,
-                                   const vec2 rand)
-{
-    // Construct a temporary frame.
-    const OpenPBR_Basis basis_ff = openpbr_make_basis(normal_ff);
-
-    // Choose microfacet normal (in local space).
-    const vec3 half_vector_local =
-        openpbr_sample_aniso_ggx_smith_vndf(vec2(microfacet_distr.alpha), openpbr_world_to_local(basis_ff, view_direction), rand);
-    OPENPBR_ASSERT(half_vector_local.z >= 0.0f, "Bad half vector");
-
-    // Map half vector to world.
-    return openpbr_local_to_world(basis_ff, half_vector_local);
-}
-
-float openpbr_eval_ggx(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
-                       const vec3 half_vector,
-                       const vec3 normal_ff)
-{
-    // For the isotropic case this is algebraically equivalent to evaluating isotropic GGX from abs(dot(half_vector, normal_ff)),
-    // but this local-space form is more numerically stable at low roughnesses.
-    return openpbr_eval_aniso_ggx(openpbr_world_to_local(openpbr_make_basis(normal_ff), half_vector), vec2(microfacet_distr.alpha));
-}
-
-float openpbr_eval_smith_g1(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
-                            const vec3 view_direction_or_light_direction,
-                            float iodotn)
-{
-    return openpbr_eval_iso_smith_g1(abs(iodotn), microfacet_distr.alpha);
-}
-
-float openpbr_eval_smith_g2(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution) microfacet_distr,
-                            const vec3 view_direction,
-                            const vec3 light_direction,
-                            float idotn,
-                            float odotn)
-{
-    return openpbr_eval_iso_smith_g2(abs(idotn), abs(odotn), microfacet_distr.alpha);
-}
-
-float openpbr_get_isotropic_alpha(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_IsotropicGGXSmithVNDFMicrofacetDistribution)
-                                      microfacet_distr)
-{
-    return microfacet_distr.alpha;
-}
-
-#endif  // !OPENPBR_VNDF_MICROFACET_DISTRIBUTIONS_H
+#endif  // !OPENPBR_VNDF_MICROFACET_DISTRIBUTION_H

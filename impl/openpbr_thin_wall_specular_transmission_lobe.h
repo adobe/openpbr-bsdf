@@ -23,7 +23,7 @@
 // Specify the type of lobe that is used for the thin-wall specular reflection and transmission.
 #include "openpbr_constant_reflection_coefficient.h"
 #include "openpbr_microfacet_multiple_scattering_data.h"
-#include "openpbr_vndf_microfacet_distributions.h"
+#include "openpbr_vndf_microfacet_distribution.h"
 #define OPENPBR_MICROFACET_DISTRIBUTION_TYPE OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution
 #define OPENPBR_REFLECTION_COEFFICIENT_TYPE OpenPBR_ConstantReflectionCoefficient
 #define OPENPBR_MINIMAL_MICROFACET_LOBE_TYPE                                                                                                         \
