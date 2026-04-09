@@ -119,7 +119,7 @@ using glm::any;
 #endif  // !OPENPBR_USE_CUSTOM_VEC_TYPES
 
 // Fixed-width integer type aliases matching shader-language conventions.
-// C++ has no 'uint' keyword; std::uint32_t / std::uint16_t from <cstdint> are exact.
+// C++ has no "uint" keyword; std::uint32_t / std::uint16_t from <cstdint> are exact.
 // Unlike cassert, cstdint is safe to include at class scope (it emits only typedefs,
 // not extern "C" linkage specifications), so no #ifndef guard is needed here.
 #include <cstdint>
@@ -175,6 +175,9 @@ OPENPBR_INLINE_FUNCTION vec3 openpbr_swizzle_xyz(const vec4 v)
 // CUDA, MSL, and Slang use their respective language built-ins; NaN behavior may differ from this ternary.
 // The GLSL backend also defines it as a shim for the same reason.
 // Set OPENPBR_USE_CUSTOM_SATURATE = 1 to suppress these if your host already defines saturate().
+#ifndef OPENPBR_USE_CUSTOM_SATURATE
+#define OPENPBR_USE_CUSTOM_SATURATE 0
+#endif
 #if !OPENPBR_USE_CUSTOM_SATURATE
 
 OPENPBR_INLINE_FUNCTION float saturate(const float x)
@@ -216,15 +219,10 @@ OPENPBR_INLINE_FUNCTION vec3 saturate(const vec3 v)
 #define OPENPBR_STATIC_ASSERT(expr, message) static_assert(expr, message)
 #endif
 
-// Default: specialization constants become compile-time booleans (all features enabled at
-// default_value). Renderers with a real specialization constant pipeline - Vulkan
-// layout(constant_id), Metal function_constant, runtime dispatch tables, etc. - can
-// override both macros before including any OpenPBR header. See openpbr_settings.h.
-#ifndef OPENPBR_DECLARE_SPECIALIZATION_CONSTANT
-#define OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(constant_id_number, name, default_value) OPENPBR_CONSTEXPR_GLOBAL bool name = default_value
-#endif
+// Default specialization-constant hook. Override before including any OpenPBR
+// header if your renderer provides its own specialization constant pipeline.
 #ifndef OPENPBR_GET_SPECIALIZATION_CONSTANT
-#define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) name
+#define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) true
 #endif
 
 #endif  // OPENPBR_INTEROP_CPP_H

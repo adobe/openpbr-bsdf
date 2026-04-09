@@ -35,15 +35,17 @@
 // or can be overridden explicitly via compile-time settings.
 //
 // Sub-headers included by this file, in order:
-//   - openpbr_settings.h              compile-time configuration and feature flags
+//   - openpbr_settings.h              compile-time configuration and feature toggles
 //   - openpbr_data_constants.h        LUT dimensions and LUT ID constants
 //   - interop/openpbr_interop.h       cross-language macro layer
 //   - openpbr_resolved_inputs.h       OpenPBR_ResolvedInputs struct and default initializer
 //   - openpbr_constants.h             physical and material constants
 //   - openpbr_diffuse_specular.h      OpenPBR_DiffuseSpecular response type
 //   - openpbr_bsdf_lobe_type.h        BSDF lobe type flags
-//   - openpbr_volume_homogeneous.h    Volume type exposed by OpenPBR_PreparedBsdf
-//   - openpbr_api.h                   public API: prepare, eval, sample, pdf
+//   - openpbr_homogeneous_volume.h    OpenPBR_HomogeneousVolume type (public output of OpenPBR_PreparedBsdf)
+//   - openpbr_api.h                   public BSDF API: prepare, eval, sample, pdf
+//                                     (also exposes OpenPBR_PreparedBsdf and OpenPBR_VolumeDerivedProps
+//                                      via impl/openpbr_bsdf.h, since their fields depend on internal lobe types)
 
 // Configuration and compile-time settings
 #include "openpbr_settings.h"
@@ -67,9 +69,9 @@
 #include "openpbr_bsdf_lobe_type.h"
 
 // Volume type (OpenPBR_HomogeneousVolume) exposed via OpenPBR_PreparedBsdf
-#include "openpbr_volume_homogeneous.h"
+#include "openpbr_homogeneous_volume.h"
 
-// Main BSDF evaluation API (prepare, sample, eval, pdf)
+// Main BSDF evaluation API (prepare, eval, sample, pdf)
 #include "openpbr_api.h"
 
 #endif  // OPENPBR_H

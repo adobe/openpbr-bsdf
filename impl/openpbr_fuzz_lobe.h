@@ -153,6 +153,8 @@ float openpbr_disney_sheen_eval_ltc(const vec3 wi_local, const vec3 ltc_coeffs)
     const float b_inv = ltc_coeffs[1];
     vec3 wi_original_local = vec3(a_inv * wi_local.x + b_inv * wi_local.z, a_inv * wi_local.y, wi_local.z);
     const float len = length(wi_original_local);
+    if (len == 0.0f)
+        return 0.0f;
     wi_original_local /= len;
 
     const float det = a_inv * a_inv;
@@ -260,7 +262,7 @@ vec3 openpbr_disney_sheen_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
 {
     const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
     const float cos_theta_i = openpbr_get_cos_theta_local(wi_local);
-    if (cos_theta_o < 0.0f || cos_theta_i < 0.0f)
+    if (cos_theta_o <= 0.0f || cos_theta_i <= 0.0f)
         return vec3(0.0f);
 
     // Rotate coordinate frame to align with incident direction wo_local.
@@ -299,7 +301,7 @@ bool openpbr_disney_sheen_sample_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
                                    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(vec3) wi_local)
 {
     const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
-    if (cos_theta_o < 0.0f)
+    if (cos_theta_o <= 0.0f)
     {
         wi_local = vec3(0.0f);
         return false;
@@ -323,8 +325,9 @@ float openpbr_disney_sheen_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(Op
                                const vec3 wo_local,
                                const vec3 wi_local)
 {
-    const float cos_theta_o = openpbr_get_cos_theta_local(wo_local), cos_theta_i = openpbr_get_cos_theta_local(wi_local);
-    if (cos_theta_o < 0.0f || cos_theta_i < 0.0f)
+    const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
+    const float cos_theta_i = openpbr_get_cos_theta_local(wi_local);
+    if (cos_theta_o <= 0.0f || cos_theta_i <= 0.0f)
         return 0.0f;
 
     // Rotate coordinate frame to align with incident direction wo_local.
@@ -349,7 +352,7 @@ float openpbr_proportion_reflected(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
     // is based on a volume of finite density and thickness.
 
     const float cos_theta = openpbr_get_cos_theta_local(direction_local);
-    if (cos_theta < 0.0f)
+    if (cos_theta <= 0.0f)
         return 0.0f;
 
     // The third component of each of the items in the LTC LUT is the overall reflectance ("R" in the paper).

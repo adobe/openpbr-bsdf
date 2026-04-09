@@ -14,8 +14,8 @@
  * limitations under the License.
  ***************************************************************************/
 
-#ifndef OPENPBR_VOLUME_HOMOGENEOUS_H
-#define OPENPBR_VOLUME_HOMOGENEOUS_H
+#ifndef OPENPBR_HOMOGENEOUS_VOLUME_H
+#define OPENPBR_HOMOGENEOUS_VOLUME_H
 
 #include "impl/openpbr_sampling.h"
 #include "openpbr_basis.h"
@@ -354,7 +354,7 @@ OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_anisotropic_phase_function(OPENPBR_A
 {
     OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
 
-    // For details, see https://www.astro.umd.edu/~jph/HG_note.pdf
+    // For details, see https://pages.astro.umd.edu/~jph/HG_note.pdf
     const float g = volume.anisotropy;
     const float s = 2.0f * rand.x - 1.0f;
     const float cos_theta = g == 0 ? s : (0.5f / g) * (1.0f + openpbr_square(g) - openpbr_square((1.0f - openpbr_square(g)) / (1.0f + g * s)));
@@ -374,7 +374,7 @@ openpbr_calculate_anisotropic_phase_function_value(OPENPBR_ADDRESS_SPACE_THREAD 
 {
     OPENPBR_ASSERT(abs(volume.anisotropy) < 1.0f, "Invalid volume scattering anisotropy.");
 
-    // For details, see https://www.astro.umd.edu/~jph/HG_note.pdf
+    // For details, see https://pages.astro.umd.edu/~jph/HG_note.pdf
     const float g = volume.anisotropy;
     const float cos_theta = dot(-view_direction, light_direction);
     return OpenPBR_RcpFourPi * (1.0f - openpbr_square(g)) / openpbr_three_halves_power(1.0f + openpbr_square(g) - 2.0f * g * cos_theta);

@@ -23,7 +23,6 @@
 #include "openpbr_diffuse_lobe.h"
 #include "openpbr_lobe_utils.h"
 #include "openpbr_microfacet_multiple_scattering_lobes.h"
-#include "openpbr_specialization_constants.h"
 #include "openpbr_thin_wall_diffuse_transmission_lobe.h"
 #include "openpbr_thin_wall_specular_transmission_lobe.h"
 

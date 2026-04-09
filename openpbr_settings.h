@@ -35,8 +35,7 @@
 //   - OPENPBR_USE_CUSTOM_SATURATE      — suppress OpenPBR's saturate() shim
 //   - OPENPBR_USE_CUSTOM_VEC_TYPES     — suppress vec2/vec3/vec4 aliases and GLM using-declarations
 //
-// GPU pipeline hooks — override both if your renderer has a real specialization constant pipeline:
-//   - OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default_value)
+// GPU pipeline hook — override if your renderer has a real specialization constant pipeline:
 //   - OPENPBR_GET_SPECIALIZATION_CONSTANT(name)
 //
 // Advanced escape hatches — rarely needed:
@@ -213,33 +212,27 @@
 // Specialization Constant Hooks
 // =============================
 //
-// OpenPBR uses specialization constants to eliminate dead code paths for disabled
-// features at pipeline-specialization time. All four constants default to 'true':
+// OpenPBR uses feature toggles to eliminate dead code paths for disabled features at
+// compile or specialization time:
 //   EnableSheenAndCoat, EnableDispersion, EnableTranslucency, EnableMetallic
 //
-// Two macros control declaration and access. Their defaults produce plain compile-time
-// booleans, which is correct for offline renderers and standalone use. GPU renderers with
-// a real specialization constant pipeline should override both before including openpbr.h.
-// The interop headers define the defaults only if neither macro is already defined.
-//
-//   OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default_value)
-//       Default: 'static inline constexpr bool name = default_value'
-//       Override to wire up Vulkan layout(constant_id = id), Metal function_constant,
-//       CPU runtime dispatch tables, etc.
+// A single macro controls access:
 //
 //   OPENPBR_GET_SPECIALIZATION_CONSTANT(name)
-//       Default: 'name'  (returns the compile-time boolean directly)
-//       Override to read the value through your renderer's dispatch mechanism.
+//       Default: true
+//       name is one of the four toggle names listed above, passed as a token.
+//       Override to return the corresponding bool through your renderer's
+//       specialization constant pipeline (Vulkan layout(constant_id),
+//       Metal function_constant, CPU runtime lookup, etc.).
 //
 // Example override (before including openpbr.h):
-//   #define OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(id, name, default) ...
-//   #define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) ...
+//   #define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) my_get_feature_toggle(name)
 //   #include "openpbr.h"
 //
 
-// =======================
+// ======================
 // Custom Assertion Hooks
-// =======================
+// ======================
 //
 // Pre-define any of these before including openpbr.h to redirect assertions to a custom system:
 //

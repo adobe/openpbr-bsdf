@@ -22,13 +22,12 @@
 #include "../openpbr_constants.h"
 #include "../openpbr_diffuse_specular.h"
 #include "../openpbr_resolved_inputs.h"
-#include "../openpbr_volume_homogeneous.h"
+#include "../openpbr_homogeneous_volume.h"
 
 #include "openpbr_dispersion_utils.h"
 #include "openpbr_fuzz_lobe.h"  // only need to include outermost lobe
 #include "openpbr_math.h"
 #include "openpbr_sampling.h"
-#include "openpbr_specialization_constants.h"
 #include "openpbr_volume_utils.h"
 
 // Volume-derived properties computed during cache_material_volume.
@@ -41,16 +40,30 @@ struct OpenPBR_VolumeDerivedProps
     vec3 transmission_tint;                 // tint from zero-distance absorption (needs to be made view-dependent in thin-wall mode)
 };
 
-// Final prepared outputs: volume and cached BSDF lobes ready for the integrator.
+// The fully prepared BSDF state returned by openpbr_prepare().
+//
+// Two public outputs are available for direct use by the integrator:
+//   - volume    Interior volume of the material (the medium inside the closed surface), derived
+//               from the full OpenPBR parameter set. Apply to ray segments traveling inside the
+//               object after a transmission event. Blends subsurface and transmission into a
+//               single unified homogeneous volume.
+//   - emission  Surface emission in nits (cd/m^2), attenuated by coat and fuzz.
+//
+// The remaining fields are internal state consumed by openpbr_eval(), openpbr_sample(), and openpbr_pdf().
 struct OpenPBR_PreparedBsdf
 {
-    OpenPBR_HomogeneousVolume volume;                      // final volume to hand to integrator
-    OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe fuzz_lobe;  // fully cached lobes ready for eval/pdf/sample
-    vec3 view_direction;                                   // view direction used during preparation (must match at eval/sample/pdf)
+    // Public outputs (for direct integrator use):
+    OpenPBR_HomogeneousVolume volume;
+    vec3 emission;
+
+    // Internal state (do not access directly; used by openpbr_eval(), openpbr_sample(), and openpbr_pdf()):
+    OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe fuzz_lobe;
+    vec3 view_direction;
 };
 
-// Determines whether RGB wavelengths are needed for dispersion or thin film effects.
-// This is used by the material layer to decide whether to generate RGB wavelengths for the path.
+// Returns true if the material requires distinct per-channel (RGB) wavelengths, i.e. when
+// dispersion or thin-film iridescence is active. Call this before openpbr_prepare() to decide
+// whether to generate stochastic RGB wavelengths for the current path.
 bool openpbr_needs_rgb_wavelengths(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs)
 {
     const bool needs_rgb_wavelengths_for_dispersion = OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion) &&
@@ -60,12 +73,20 @@ bool openpbr_needs_rgb_wavelengths(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
     return needs_rgb_wavelengths_for_dispersion || needs_rgb_wavelengths_for_thin_film;
 }
 
-// Derives volume properties and transmission tint from resolved inputs.
-// This is the BSDF layer's volume setup logic - it derives volume_derived_props and the final volume
-// from the resolved material inputs. Must be called after texture evaluation populates resolved_inputs.
+// Derives volume properties from resolved inputs and populates prepared.volume and volume_derived_props.
+// Populates prepared.volume; does not touch prepared.fuzz_lobe, prepared.view_direction, or prepared.emission.
+//
+// volume_derived_props is an intermediary that must be passed unchanged to openpbr_prepare_lobes()
+// afterward if BSDF lobes will be needed. It carries volume-derived state (transmission tint, thin-wall
+// subsurface properties) that the lobe setup depends on.
+//
+// volumes_enabled: pass false when the scene contains no volumes (no subsurface scattering, no
+// transmission depth) to skip volumetric parameter derivation; prepared.volume will be empty.
+//
+// Must be called after texture evaluation populates resolved_inputs.
 void openpbr_prepare_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
-                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_VolumeDerivedProps) volume_derived_props,
-                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_HomogeneousVolume) volume,
+                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_VolumeDerivedProps) volume_derived_props,
+                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_PreparedBsdf) prepared,
                             const bool volumes_enabled)
 {
     // All inputs are now in resolved_inputs - this function derives volume properties and stores them in volume_derived_props.
@@ -150,7 +171,7 @@ void openpbr_prepare_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
                                 transmission_volume,
                                 subsurface_fraction_of_dielectric * reciprocal_of_subsurface_and_transmission_fraction_of_dielectric,
                                 transmission_fraction_of_dielectric * reciprocal_of_subsurface_and_transmission_fraction_of_dielectric);
-        volume = combined_volume;
+        prepared.volume = combined_volume;
     }
     else  // !volumes_enabled
     {
@@ -177,7 +198,7 @@ void openpbr_prepare_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
         }
 
         // Handle the special case that occurs when the transmission depth is zero or we're in thin-wall mode.
-        // When volumes_enabled is true, transmission_tint is initialized in openpbr_prepare_volume.
+        // When volumes_enabled is true, transmission_tint is initialized in the "if (volumes_enabled)" branch above.
         // When volumes_enabled is false, transmission_tint is initialized here instead.
         if (resolved_inputs.transmission_depth == 0.0f || resolved_inputs.geometry_thin_walled)  // special cases
         {
@@ -194,7 +215,7 @@ void openpbr_prepare_volume(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
 
         // Initialize volume in case it's used in some code that doesn't take into
         // account whether volumes are enabled (such as during shadow-ray tracing).
-        volume = openpbr_make_empty_volume();
+        prepared.volume = openpbr_make_empty_volume();
     }
 }
 
@@ -245,21 +266,27 @@ vec3 openpbr_compute_final_transmission_tint(const vec3 transmission_tint,
     return pow(transmission_tint, vec3(path_length));
 }
 
-// Sets up lobes based on input params.
+// Sets up BSDF lobes from resolved inputs and caches view_direction in "prepared".
+// Populates prepared.fuzz_lobe and prepared.view_direction; does not touch prepared.volume or prepared.emission.
+//
+// volume_derived_props must have been populated by a prior call to openpbr_prepare_volume().
 // Incoming direction must point away from the surface.
 // Shading normal frame must be orthonormal.
 void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
                            OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_VolumeDerivedProps) volume_derived_props,
-                           OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) fuzz_lobe,
+                           OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_PreparedBsdf) prepared,
                            const vec3 path_throughput,
                            const vec3 rgb_wavelengths_nm,
                            const float exterior_ior,
                            const vec3 view_direction)
 {
+    // Cache view_direction for use by openpbr_prepare_emission(), openpbr_eval(), openpbr_sample(), and openpbr_pdf().
+    prepared.view_direction = view_direction;
+
     // Determine whether we're hitting the surface from the front or the back
     // (based on normals, not on IORs) and whether we're inside the object
     // (if there is an interior at all).
-    const float cos_theta = dot(view_direction, resolved_inputs.shading_basis.n);
+    const float cos_theta = dot(view_direction, resolved_inputs.geometry_basis.n);
     const bool back_facing = cos_theta < 0.0f;
     const bool inside = back_facing && !resolved_inputs.geometry_thin_walled;  // if thin-walled, we always hit from the outside
 
@@ -271,7 +298,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     // without special-casing throughout the shading code.
 
     // Set up normal_ff, the forward-facing version of the shading normal.
-    OpenPBR_Basis specular_anisotropy_basis_ff = resolved_inputs.shading_basis;
+    OpenPBR_Basis specular_anisotropy_basis_ff = resolved_inputs.geometry_basis;
     openpbr_rotate_basis_around_normal(specular_anisotropy_basis_ff, resolved_inputs.specular_anisotropy_rotation_cos_sin);
     specular_anisotropy_basis_ff.t = normalize(specular_anisotropy_basis_ff.t);
     specular_anisotropy_basis_ff.b = normalize(specular_anisotropy_basis_ff.b);
@@ -285,14 +312,14 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     }
     const vec3 normal_ff = specular_anisotropy_basis_ff.n;
 
-    // Make coat_normal_ff depend on coat_basis.n instead of shading_basis.n
+    // Make coat_normal_ff depend on geometry_coat_basis.n instead of geometry_basis.n
     // and update the coat normal basis to be in the same hemisphere as the view direction.
-    OpenPBR_Basis coat_anisotropy_basis_ff = resolved_inputs.coat_basis;
+    OpenPBR_Basis coat_anisotropy_basis_ff = resolved_inputs.geometry_coat_basis;
     openpbr_rotate_basis_around_normal(coat_anisotropy_basis_ff, resolved_inputs.coat_anisotropy_rotation_cos_sin);
     coat_anisotropy_basis_ff.t = normalize(coat_anisotropy_basis_ff.t);
     coat_anisotropy_basis_ff.b = normalize(coat_anisotropy_basis_ff.b);
 
-    if (dot(view_direction, resolved_inputs.coat_basis.n) < 0.0f)  // back-facing coat
+    if (dot(view_direction, resolved_inputs.geometry_coat_basis.n) < 0.0f)  // back-facing coat
         openpbr_invert_basis(coat_anisotropy_basis_ff);
     const vec3 coat_normal_ff = coat_anisotropy_basis_ff.n;
 
@@ -662,7 +689,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Set up thin-wall specular-transmission lobe.
 
-    openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe.thin_wall_specular_trans_lobe,
+    openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe.thin_wall_specular_trans_lobe,
                             normal_ff,
                             microfacet_distr,  // TODO: Incorporate IOR so blur reduces as IOR approaches 1.
                             thin_wall_specular_transmission_albedo);
@@ -683,7 +710,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Set up thin-wall diffuse-transmission lobe.
 
-    openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe.thin_wall_diffuse_trans_lobe,
+    openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe.thin_wall_diffuse_trans_lobe,
                             normal_ff,
                             view_direction,
                             thin_wall_subsurface_transmission_albedo,
@@ -717,7 +744,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Finally, create the actual specular lobe.
 
-    openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe.specular_lobe,
+    openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe.specular_lobe,
                             normal_ff,
                             microfacet_distr,
                             refl_trans_coeff,
@@ -730,7 +757,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     // TODO: Avoid initializing and using these lobes if they don't contribute.
     if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableTranslucency))
     {
-        openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe.dielectric_mms_lobe,
+        openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe.dielectric_mms_lobe,
                                 normal_ff,
                                 view_direction,
                                 specular_alpha,
@@ -744,14 +771,14 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
         // secondary microfacet intersection) (although even more than one additional bounce may occur in reality).
         const vec3 scale_for_metal_reflection = openpbr_square(metal_average_fresnel) * darkened_metal;
         openpbr_initialize_lobe(
-            fuzz_lobe.coating_lobe.base_lobe.metal_mms_lobe, normal_ff, view_direction, specular_alpha, scale_for_metal_reflection);
+            prepared.fuzz_lobe.coating_lobe.base_lobe.metal_mms_lobe, normal_ff, view_direction, specular_alpha, scale_for_metal_reflection);
     }
 
     // Create and add a diffuse lobe.
     const vec3 diffuse_albedo = weighted_base_color * opaque_dielectric;
     const vec3 thin_wall_aware_diffuse_albedo = diffuse_albedo + thin_wall_subsurface_reflection_albedo;
     // TODO: Avoid initializing and using this lobe if it doesn't contribute.
-    openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe.diffuse_lobe,
+    openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe.diffuse_lobe,
                             normal_ff,
                             view_direction,
                             thin_wall_aware_diffuse_albedo,
@@ -760,7 +787,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
                             relative_ior_for_opaque_reflection);
 
     // Finish setting up the aggregate lobe based on its constituent lobes.
-    openpbr_initialize_lobe(fuzz_lobe.coating_lobe.base_lobe, view_direction, path_throughput);
+    openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.base_lobe, view_direction, path_throughput);
 
     if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat))
     {
@@ -770,8 +797,8 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
         const OpenPBR_IorReflectionCoefficient coat_refl_trans_coeff = OPENPBR_MAKE_STRUCT_1(OpenPBR_IorReflectionCoefficient, relative_coat_ior);
         const OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution coat_microfacet_distr = OPENPBR_MAKE_STRUCT_3(
             OpenPBR_AnisotropicGGXSmithVNDFMicrofacetDistribution, anisotropic_coat_alpha, coat_anisotropy_basis_ff, coat_alpha);
-        openpbr_initialize_lobe(fuzz_lobe.coating_lobe.coat_reflection_lobe, coat_normal_ff, coat_microfacet_distr, coat_refl_trans_coeff);
-        openpbr_initialize_lobe(fuzz_lobe.coating_lobe,
+        openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe.coat_reflection_lobe, coat_normal_ff, coat_microfacet_distr, coat_refl_trans_coeff);
+        openpbr_initialize_lobe(prepared.fuzz_lobe.coating_lobe,
                                 coat_normal_ff,
                                 view_direction,
                                 resolved_inputs.coat_color,
@@ -797,7 +824,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
         OPENPBR_ASSERT(openpbr_is_normalized(fuzz_normal_ff) && dot(view_direction, fuzz_normal_ff) >= 0.0f,
                        "Fuzz normal must be a face-forwarded unit vector");
 
-        openpbr_initialize_lobe(fuzz_lobe,
+        openpbr_initialize_lobe(prepared.fuzz_lobe,
                                 fuzz_normal_ff,
                                 view_direction,
                                 resolved_inputs.fuzz_roughness,
@@ -806,36 +833,96 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     }
 }
 
-// Main initialization entrypoint: prepares both volume and BSDF lobes from resolved inputs.
-// For specialized code paths that only need the volume (e.g., translucent shadow rays for caustics replacement),
-// call openpbr_prepare_volume and openpbr_prepare_lobes separately to avoid unnecessary lobe setup.
-OpenPBR_PreparedBsdf openpbr_prepare_bsdf_and_volume_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
-                                                          const vec3 path_throughput,
-                                                          const vec3 rgb_wavelengths_nm,
-                                                          const float exterior_ior,
-                                                          const vec3 view_direction)
+// Computes surface emission attenuated by the coat and fuzz layers, returning it as a vec3.
+//
+// Emission is only produced on the exterior side of the surface: non-thin-walled geometry
+// returns zero when hit from the inside; thin-walled geometry always emits (no interior).
+//
+// The result is in nits (cd/m^2) per the OpenPBR specification.
+// Renderers that do not use physical units must scale the result accordingly.
+//
+// Requires that openpbr_prepare_lobes() has already been called to populate the coat/fuzz
+// state and cache view_direction in "prepared".
+vec3 openpbr_compute_emission(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
+                              OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared)
+{
+    if (resolved_inputs.emission_luminance == 0.0f || all(equal(resolved_inputs.emission_color, vec3(0.0f))))
+        return vec3(0.0f);
+
+    // Suppress emission when hitting from inside the object.
+    // Thin-walled surfaces always emit from both sides (they have no interior).
+    const float cos_theta = dot(prepared.view_direction, resolved_inputs.geometry_basis.n);
+    const bool back_facing = cos_theta < 0.0f;
+    const bool inside = back_facing && !resolved_inputs.geometry_thin_walled;
+    if (inside)
+        return vec3(0.0f);
+
+    vec3 result = resolved_inputs.emission_luminance * resolved_inputs.emission_color;
+    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat))
+    {
+        // Coat absorption is wavelength-dependent; scale by the vec3 coat transmittance.
+        if (resolved_inputs.coat_weight > 0.0f)
+            result *= openpbr_base_layer_scale_incoming(prepared.fuzz_lobe.coating_lobe);
+
+        // Fuzz transmittance is achromatic; scale by the scalar fuzz transmittance.
+        if (resolved_inputs.fuzz_weight > 0.0f)
+            result *= vec3(openpbr_base_layer_scale_incoming(prepared.fuzz_lobe));
+    }
+    return result;
+}
+
+// Computes emission and caches it in prepared.emission.
+// openpbr_prepare() calls this automatically; call it explicitly only in staged initialization,
+// after openpbr_prepare_lobes() has populated the coat/fuzz state and cached view_direction.
+void openpbr_prepare_emission(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
+                              OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_PreparedBsdf) prepared)
+{
+    prepared.emission = openpbr_compute_emission(resolved_inputs, prepared);
+}
+
+// Main initialization entrypoint: prepares volume, BSDF lobes, and emission from resolved inputs.
+//
+// For renderers that need to skip unnecessary work (e.g., shadow rays that only need the volume),
+// call openpbr_prepare_volume() and openpbr_prepare_lobes() individually instead — see README.md
+// for the staged initialization workflow.
+OpenPBR_PreparedBsdf openpbr_prepare_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
+                                          const vec3 path_throughput,
+                                          const vec3 rgb_wavelengths_nm,
+                                          const float exterior_ior,
+                                          const vec3 view_direction)
 {
     OpenPBR_PreparedBsdf prepared;
-
-    // Cache the view direction for use in eval/sample/pdf.
-    prepared.view_direction = view_direction;
 
     OpenPBR_VolumeDerivedProps volume_derived_props;
 
     OPENPBR_CONSTEXPR_LOCAL bool VolumesEnabled = true;
 
     // Step 1: Set up the volume and any derived properties from resolved inputs.
-    openpbr_prepare_volume(resolved_inputs, volume_derived_props, prepared.volume, VolumesEnabled);
+    openpbr_prepare_volume(resolved_inputs, volume_derived_props, prepared, VolumesEnabled);
 
-    // Step 2: Set up BSDF lobes using resolved inputs and the volume-derived properties.
-    openpbr_prepare_lobes(
-        resolved_inputs, volume_derived_props, prepared.fuzz_lobe, path_throughput, rgb_wavelengths_nm, exterior_ior, view_direction);
+    // Step 2: Set up BSDF lobes and cache view_direction in "prepared".
+    openpbr_prepare_lobes(resolved_inputs, volume_derived_props, prepared, path_throughput, rgb_wavelengths_nm, exterior_ior, view_direction);
+
+    // Step 3: Compute and cache emission.
+    openpbr_prepare_emission(resolved_inputs, prepared);
 
     return prepared;
 }
 
 // Importance-samples a light direction and returns weight, PDF, and sampled lobe type.
 //
+// The returned weight includes the cosine term; specifically it is the BSDF value
+// multiplied by cos(theta) and divided by the PDF (with respect to solid angle).
+// It takes all lobes and all sampling techniques into account (effectively doing MIS internally).
+//
+// BSDF values returned include cosine term.
+OpenPBR_DiffuseSpecular openpbr_eval_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared, const vec3 light_direction)
+{
+    return OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat)
+               ? openpbr_calculate_lobe_value(prepared.fuzz_lobe, prepared.view_direction, light_direction)
+               : openpbr_calculate_lobe_value(prepared.fuzz_lobe.coating_lobe.base_lobe, prepared.view_direction, light_direction);
+}
+
 // The returned weight includes the cosine term; specifically it is the BSDF value
 // multiplied by cos(theta) and divided by the PDF (with respect to solid angle).
 // It takes all lobes and all sampling techniques into account (effectively doing MIS internally).
@@ -867,14 +954,6 @@ void openpbr_sample_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
     }
 }
 
-// BSDF values returned include cosine term.
-OpenPBR_DiffuseSpecular openpbr_eval_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared, const vec3 light_direction)
-{
-    return OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat)
-               ? openpbr_calculate_lobe_value(prepared.fuzz_lobe, prepared.view_direction, light_direction)
-               : openpbr_calculate_lobe_value(prepared.fuzz_lobe.coating_lobe.base_lobe, prepared.view_direction, light_direction);
-}
-
 float openpbr_pdf_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared, const vec3 light_direction)
 {
     return OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat)
@@ -882,63 +961,21 @@ float openpbr_pdf_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Pr
                : openpbr_calculate_lobe_pdf(prepared.fuzz_lobe.coating_lobe.base_lobe, prepared.view_direction, light_direction);
 }
 
-// Computes the emission that exits the surface after passing through the coat and fuzz layers.
-//
-// Reads emission_luminance and emission_color from resolved_inputs and scales by the
-// transmittance of the coat and fuzz layers as seen from the view direction used during
-// openpbr_prepare_lobes(). Both fields must be populated in resolved_inputs before calling
-// (openpbr_make_default_resolved_inputs() sets emission_luminance = 0 so default inputs
-// produce zero emission). openpbr_prepare_lobes() or openpbr_prepare_bsdf_and_volume()
-// must also have been called first so that the coat and fuzz lobes in "prepared" are ready.
-//
-// Returns emission in nits (cd/m²) per the OpenPBR specification. Coat attenuation is
-// wavelength-dependent (vec3); fuzz attenuation is achromatic (scalar). Respects the
-// EnableSheenAndCoat specialization constant.
-//
-// Renderers that do not work in physical units must scale the result before accumulating.
-// E.g., a renderer where 1.0 = 1000 nits should multiply the result by 0.001.
-//
-// Note: emission is a first-class output of the OpenPBR model and must be obtained by
-// calling this function — reading emission_luminance * emission_color directly from
-// resolved_inputs bypasses the coat and fuzz attenuation. Unlike translucent shadows
-// (an integrator-level approximation), this is a candidate for promotion to openpbr_api.h;
-// see README.md for the open design decisions.
-vec3 openpbr_compute_emission(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs,
-                              OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared)
-{
-    vec3 result = resolved_inputs.emission_luminance * resolved_inputs.emission_color;
-    if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat))
-    {
-        // Coat absorption is wavelength-dependent; scale by the vec3 coat transmittance.
-        if (resolved_inputs.coat_weight > 0.0f)
-            result *= openpbr_base_layer_scale_incoming(prepared.fuzz_lobe.coating_lobe);
-
-        // Fuzz transmittance is achromatic; scale by the scalar fuzz transmittance.
-        if (resolved_inputs.fuzz_weight > 0.0f)
-            result *= vec3(openpbr_base_layer_scale_incoming(prepared.fuzz_lobe));
-    }
-    return result;
-}
-
 // Computes the probability and color weight for a biased straight-through shadow ray.
 //
-// Tracing unbiased refractive shadow paths through transmissive or subsurface-scattering
-// materials is expensive and produces difficult-to-sample caustics. This function enables
-// a practical approximation: a shadow ray passes straight through the surface with a given
-// probability, weighted by Fresnel reflectance, coat tinting, and instantaneous transmission
-// absorption. The unbiased complement is handled by the full path-tracing integrator.
+// Transmissive and subsurface-scattering materials produce expensive refractive caustics.
+// This function provides a practical approximation: the shadow ray passes straight through
+// the surface with a material-derived probability, weighted by Fresnel reflectance, coat
+// tinting, and instantaneous transmission absorption. The remaining light transport is
+// handled unbiased by the path-tracing integrator.
 //
-// The hit surface's own roughness is already factored in: rough transmissive surfaces
-// return a lower probability (approaching zero at roughness 1), at which point direct
-// light sampling by the path tracer is more effective than the approximation. The
-// probability can additionally be scaled by a weight derived from the roughness of the
-// originating scattering event to further suppress the approximation when the path tracer
-// can find the caustic efficiently (e.g., near-specular origin) and lean on it more when
-// it cannot (e.g., diffuse or rough-specular origin).
+// Surface roughness is factored in: rough transmissive surfaces return a lower probability
+// (approaching zero at roughness 1). The caller may further scale the probability by the
+// roughness of the originating scattering event.
 //
 // Returns vec4(weight.xyz, probability):
 //   weight.xyz   - color transmittance to apply to the shadow ray throughput
-//   probability  - material's straight-through probability (before roughness scaling);
+//   probability  - material's straight-through probability (before caller scaling);
 //                  0 for fully opaque materials (early-out; weight is undefined)
 //
 // cos_theta = dot(surface_normal, shadow_ray_direction); positive = front side.

@@ -27,6 +27,10 @@
 #ifndef OPENPBR_INTEROP_H
 #define OPENPBR_INTEROP_H
 
+#ifndef OPENPBR_USE_CUSTOM_INTEROP
+#define OPENPBR_USE_CUSTOM_INTEROP 0
+#endif
+
 #if !OPENPBR_USE_CUSTOM_INTEROP
 
 // Ensure target flags exist even if openpbr_settings.h was not included first.

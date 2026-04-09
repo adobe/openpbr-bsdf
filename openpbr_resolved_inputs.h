@@ -84,11 +84,12 @@ struct OpenPBR_ResolvedInputs
     float geometry_opacity;
     bool geometry_thin_walled;
 
-    // Precomputed bases (must be provided). Populate from evaluated geometry_normal/geometry_tangent
-    // (and derived bitangent) for the base, and geometry_coat_normal/geometry_coat_tangent
-    // (and derived bitangent) for the coat. Caller must compute bitangents and handedness correctly.
-    OpenPBR_Basis shading_basis;
-    OpenPBR_Basis coat_basis;
+    // Precomputed geometry bases (must be provided). geometry_basis replaces
+    // geometry_normal/geometry_tangent, and geometry_coat_basis replaces
+    // geometry_coat_normal/geometry_coat_tangent. Caller must compute bitangents
+    // and handedness correctly.
+    OpenPBR_Basis geometry_basis;
+    OpenPBR_Basis geometry_coat_basis;
 };
 
 // Returns a fully initialized set of resolved inputs using the OpenPBR specification defaults.
@@ -154,8 +155,8 @@ OPENPBR_INLINE_FUNCTION OpenPBR_ResolvedInputs openpbr_make_default_resolved_inp
     inputs.geometry_thin_walled = false;
 
     // Bases
-    inputs.shading_basis = OPENPBR_MAKE_STRUCT_3(OpenPBR_Basis, vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
-    inputs.coat_basis = inputs.shading_basis;
+    inputs.geometry_basis = OPENPBR_MAKE_STRUCT_3(OpenPBR_Basis, vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f));
+    inputs.geometry_coat_basis = inputs.geometry_basis;
 
     return inputs;
 }
