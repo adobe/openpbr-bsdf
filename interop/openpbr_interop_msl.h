@@ -56,6 +56,9 @@
 // Math type aliases to match GLSL naming conventions.
 // MSL uses float2/float3/float4, but OpenPBR code uses vec2/vec3/vec4.
 // Set OPENPBR_USE_CUSTOM_VEC_TYPES = 1 to suppress these if your host already defines them.
+#ifndef OPENPBR_USE_CUSTOM_VEC_TYPES
+#define OPENPBR_USE_CUSTOM_VEC_TYPES 0
+#endif
 #if !OPENPBR_USE_CUSTOM_VEC_TYPES
 using vec2 = float2;
 using vec3 = float3;
@@ -121,15 +124,10 @@ using vec4 = float4;
 #define OPENPBR_STATIC_ASSERT(expr, message) static_assert(expr, message)
 #endif
 
-// Default: specialization constants become compile-time booleans (all features enabled at
-// default_value). Renderers with a real specialization constant pipeline - Vulkan
-// layout(constant_id), Metal function_constant, runtime dispatch tables, etc. - can
-// override both macros before including any OpenPBR header. See openpbr_settings.h.
-#ifndef OPENPBR_DECLARE_SPECIALIZATION_CONSTANT
-#define OPENPBR_DECLARE_SPECIALIZATION_CONSTANT(constant_id_number, name, default_value) OPENPBR_CONSTEXPR_GLOBAL bool name = default_value
-#endif
+// Default specialization-constant hook. Override before including any OpenPBR
+// header if your renderer provides its own specialization constant pipeline.
 #ifndef OPENPBR_GET_SPECIALIZATION_CONSTANT
-#define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) name
+#define OPENPBR_GET_SPECIALIZATION_CONSTANT(name) true
 #endif
 
 #endif  // OPENPBR_INTEROP_MSL_H

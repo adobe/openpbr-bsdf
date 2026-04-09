@@ -22,9 +22,10 @@
 // g++ -std=c++17 -I/path/to/openpbr-bsdf -I/path/to/glm minimal_cpp_example.cpp -o minimal_cpp_example && ./minimal_cpp_example
 //
 // Expected output:
-// Sampled direction : (-0.689796, 0.165627, 0.704805)
-// Throughput weight : (0.834542, 0.495157, 0.359402)
-// Sampling PDF      : 0.320592
+// Sampled direction : (-0.683459, 0.109225, 0.721771)
+// Throughput weight : (0.615105, 0.400597, 0.314794)
+// Sampling PDF      : 0.520167
+// Lobe type         : 9
 
 // Include GLM before openpbr.h so the C++ interop layer can use GLM types and functions.
 #include <glm/glm.hpp>
@@ -55,8 +56,8 @@ int main()
     inputs.base_color = vec3(0.8f, 0.3f, 0.1f);  // terracotta
     inputs.specular_roughness = 0.4f;
 
-    // The local frame at the surface hit point is stored in inputs.shading_basis,
-    // which is not part of the official OpenPBR spec.
+    // The local frame at the surface hit point is stored in inputs.geometry_basis,
+    // which is an Eclair extension replacing geometry_normal/geometry_tangent.
     // It defaults to a Z-up frame: tangent = X, bitangent = Y, normal = Z.
     // In a real renderer, replace it with world-space vectors from the geometry,
     // and keep view_direction and light_direction in that same space.
@@ -64,14 +65,14 @@ int main()
     // 2. Prepare the BSDF.
 
     // view_direction points away from the surface toward the camera
-    // and must be in the same space as shading_basis. Here it is 45 degrees from the surface normal.
+    // and must be in the same space as geometry_basis. Here it is 45 degrees from the surface normal.
     const vec3 view_direction = normalize(vec3(1.0f, 0.0f, 1.0f));
 
-    const OpenPBR_PreparedBsdf prepared = openpbr_prepare_bsdf_and_volume(inputs,
-                                                                          vec3(1.0f),                     // path throughput
-                                                                          OpenPBR_BaseRgbWavelengths_nm,  // fixed RGB wavelengths for this example
-                                                                          OpenPBR_VacuumIor,              // IOR of the medium above the surface
-                                                                          view_direction);
+    const OpenPBR_PreparedBsdf prepared = openpbr_prepare(inputs,
+                                                          vec3(1.0f),                     // path throughput
+                                                          OpenPBR_BaseRgbWavelengths_nm,  // fixed RGB wavelengths for this example
+                                                          OpenPBR_VacuumIor,              // IOR of the medium above the surface
+                                                          view_direction);
 
     // 3. Importance-sample the BSDF.
 
@@ -96,23 +97,26 @@ int main()
         std::cout << "Sampled direction : (" << light_direction.x << ", " << light_direction.y << ", " << light_direction.z << ")\n";
         std::cout << "Throughput weight : (" << weight_sum.x << ", " << weight_sum.y << ", " << weight_sum.z << ")\n";
         std::cout << "Sampling PDF      : " << pdf << "\n";
+        std::cout << "Lobe type         : " << lobe_type << "\n";
+
+        // In a real path tracer, multiply the running path throughput by weight
+        // and trace the next ray along light_direction. The PDF can also be used
+        // for MIS (multiple importance sampling) with direct-light sampling.
+
+        // To evaluate the BSDF for a known light direction instead of sampling it:
+        // OpenPBR_DiffuseSpecular bsdf_val = openpbr_eval(prepared, light_direction);
     }
     else
     {
         std::cout << "No valid BSDF sample generated\n";
     }
 
-    // In a real path tracer, multiply the running path throughput by weight
-    // and trace the next ray along light_direction. The PDF can also be used
-    // for MIS (multiple importance sampling) with direct-light sampling.
+    // prepared.volume is the interior volume of the material (the medium inside the closed
+    // surface). Apply it to ray segments traveling inside the object after a transmission event.
+    // See openpbr_homogeneous_volume.h for integration helpers.
     //
-    // lobe_type identifies which type of lobe generated the sample
-    // (for example, reflection vs. transmission, diffuse vs. specular)
-    // and can be useful for diagnostics.
-    //
-    // prepared.volume contains the homogeneous volume parameters derived from
-    // the OpenPBR inputs. Pass them to your volume integrator to handle
-    // subsurface scattering and transmission.
+    // prepared.emission contains surface emission in nits, attenuated by coat and fuzz layers.
+    // Add it directly to the path's radiance estimate at each surface hit.
 
     return 0;
 }

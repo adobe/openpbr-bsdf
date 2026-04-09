@@ -19,7 +19,6 @@
 
 #include "openpbr_lobe_utils.h"
 #include "openpbr_reflection_transmission_coefficient_structs.h"
-#include "openpbr_specialization_constants.h"
 #include "openpbr_thin_film_iridescence_utils.h"
 
 // The reflection/transmission class below is designed to handle all of the specular reflection and transmission

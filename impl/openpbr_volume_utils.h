@@ -17,7 +17,7 @@
 #ifndef OPENPBR_VOLUME_UTILS_H
 #define OPENPBR_VOLUME_UTILS_H
 
-#include "../openpbr_volume_homogeneous.h"
+#include "../openpbr_homogeneous_volume.h"
 #include "openpbr_math.h"
 
 // This file contains the math necessary to calculate
