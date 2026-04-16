@@ -121,7 +121,7 @@
 //
 //   OPENPBR_FAST_RCP_SQRT(x)     — fast 1/sqrt(x) for float x
 //   OPENPBR_FAST_SQRT(x)         — fast sqrt(x) for float x  (also applied component-wise to vec3)
-//   OPENPBR_FAST_NORMALIZE(v)    — fast normalize(v) for vec3 v
+//   OPENPBR_FAST_NORMALIZE(v)    — fast normalize(v) for vec2 and vec3 v
 //
 // Example:
 //   #define OPENPBR_FAST_RCP_SQRT(x)  fast_rcp_sqrt(x)
@@ -220,7 +220,7 @@
 //
 //   OPENPBR_GET_SPECIALIZATION_CONSTANT(name)
 //       Default: true
-//       name is one of the four toggle names listed above, passed as a token.
+//       "name" is one of the four toggle names listed above, passed as a token.
 //       Override to return the corresponding bool through your renderer's
 //       specialization constant pipeline (Vulkan layout(constant_id),
 //       Metal function_constant, CPU runtime lookup, etc.).
