@@ -327,7 +327,7 @@ OpenPBR 1.1 defines `specular_roughness_anisotropy` and `coat_roughness_anisotro
 | `specular_anisotropy_rotation_cos_sin` | `vec2` | `(1, 0)` | (cos θ, sin θ) of the specular anisotropy rotation |
 | `coat_anisotropy_rotation_cos_sin`     | `vec2` | `(1, 0)` | (cos θ, sin θ) of the coat anisotropy rotation     |
 
-Both default to `(1, 0)` = (cos 0°, sin 0°), which is a no-op equivalent to having no rotation at all. The vec2 does not need to be unit-length (as can happen after texture filtering); the BSDF normalizes the rotated tangent frame internally.
+Both default to `(1, 0)` = (cos 0°, sin 0°), which is a no-op equivalent to having no rotation at all. The vec2 does not need to be unit-length (as can happen after texture filtering); the BSDF normalizes it internally and treats `(0, 0)` as no rotation.
 
 This representation is used for two main reasons:
 
@@ -345,6 +345,10 @@ When sourcing rotation from a scalar angle (e.g., a material parameter rather th
 Thin-film iridescence and thin-walled transmission are not currently compatible: when `geometry_thin_walled` is enabled, iridescence is not visible on the transmission component. (Thin-walled subsurface scattering is unaffected and shows iridescence normally.)
 
 Note that thin-walled mode is not the right tool for soap-bubble or iridescent membrane effects regardless of this limitation — it models an incoherent two-surface windowpane (suited to thick glass), not a nanometer-scale interference coating. For those effects, use a *closed solid surface* (`geometry_thin_walled = false`) with the interior specular IOR set to 1.0 (air) and thin film enabled.
+
+### CUDA Backend: Vector Types
+
+The CUDA interop header aliases `vec2`/`vec3`/`vec4` to CUDA's `float2`/`float3`/`float4` plain structs, which lack the constructors and operators the OpenPBR codebase relies on. As a workaround, set `OPENPBR_USE_CUSTOM_VEC_TYPES=1` and provide compatible vector types before including `openpbr.h`.
 
 ---
 

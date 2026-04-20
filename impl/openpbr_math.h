@@ -22,7 +22,7 @@
 //
 //   #define OPENPBR_FAST_RCP_SQRT(x)  fast_rcp_sqrt(x)   // fast 1/sqrt(x) for float x
 //   #define OPENPBR_FAST_SQRT(x)      fast_sqrt(x)       // fast sqrt(x) for float x
-//   #define OPENPBR_FAST_NORMALIZE(v) fast_normalize(v)  // fast normalize(v) for vec3 v
+//   #define OPENPBR_FAST_NORMALIZE(v) fast_normalize(v)  // fast normalize(v) for vec2 and vec3 v
 //
 // OPENPBR_FAST_SQRT is also applied component-wise to vec3 arguments.
 
@@ -40,6 +40,7 @@
 OPENPBR_INLINE_FUNCTION float openpbr_fast_rcp_sqrt(const float x) { return OPENPBR_FAST_RCP_SQRT(x); }
 OPENPBR_INLINE_FUNCTION float openpbr_fast_sqrt(const float x)     { return OPENPBR_FAST_SQRT(x); }
 OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_sqrt(const vec3 v)      { return vec3(OPENPBR_FAST_SQRT(v.x), OPENPBR_FAST_SQRT(v.y), OPENPBR_FAST_SQRT(v.z)); }
+OPENPBR_INLINE_FUNCTION vec2  openpbr_fast_normalize(const vec2 v) { return OPENPBR_FAST_NORMALIZE(v); }
 OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_normalize(const vec3 v) { return OPENPBR_FAST_NORMALIZE(v); }
 // clang-format on
 

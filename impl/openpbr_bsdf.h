@@ -21,8 +21,8 @@
 #include "../openpbr_bsdf_lobe_type.h"
 #include "../openpbr_constants.h"
 #include "../openpbr_diffuse_specular.h"
-#include "../openpbr_resolved_inputs.h"
 #include "../openpbr_homogeneous_volume.h"
+#include "../openpbr_resolved_inputs.h"
 
 #include "openpbr_dispersion_utils.h"
 #include "openpbr_fuzz_lobe.h"  // only need to include outermost lobe
@@ -266,6 +266,19 @@ vec3 openpbr_compute_final_transmission_tint(const vec3 transmission_tint,
     return pow(transmission_tint, vec3(path_length));
 }
 
+// Applies an anisotropy rotation to an orthonormal basis.
+// The input cos_sin is normalized because filtered texture lookups can turn unit (cos, sin) pairs into non-unit vectors.
+// This preserves basis orthonormality without output renormalization.
+// Zero is treated as no rotation.
+OPENPBR_INLINE_FUNCTION void openpbr_apply_anisotropy_rotation(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_INOUT(OpenPBR_Basis) basis, const vec2 cos_sin)
+{
+    if (all(equal(cos_sin, vec2(0.0f))))
+        return;
+
+    const vec2 normalized_cos_sin = openpbr_fast_normalize(cos_sin);
+    openpbr_rotate_basis_around_normal(basis, normalized_cos_sin);
+}
+
 // Sets up BSDF lobes from resolved inputs and caches view_direction in "prepared".
 // Populates prepared.fuzz_lobe and prepared.view_direction; does not touch prepared.volume or prepared.emission.
 //
@@ -299,9 +312,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Set up normal_ff, the forward-facing version of the shading normal.
     OpenPBR_Basis specular_anisotropy_basis_ff = resolved_inputs.geometry_basis;
-    openpbr_rotate_basis_around_normal(specular_anisotropy_basis_ff, resolved_inputs.specular_anisotropy_rotation_cos_sin);
-    specular_anisotropy_basis_ff.t = normalize(specular_anisotropy_basis_ff.t);
-    specular_anisotropy_basis_ff.b = normalize(specular_anisotropy_basis_ff.b);
+    openpbr_apply_anisotropy_rotation(specular_anisotropy_basis_ff, resolved_inputs.specular_anisotropy_rotation_cos_sin);
 
     if (back_facing)
     {
@@ -315,9 +326,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     // Make coat_normal_ff depend on geometry_coat_basis.n instead of geometry_basis.n
     // and update the coat normal basis to be in the same hemisphere as the view direction.
     OpenPBR_Basis coat_anisotropy_basis_ff = resolved_inputs.geometry_coat_basis;
-    openpbr_rotate_basis_around_normal(coat_anisotropy_basis_ff, resolved_inputs.coat_anisotropy_rotation_cos_sin);
-    coat_anisotropy_basis_ff.t = normalize(coat_anisotropy_basis_ff.t);
-    coat_anisotropy_basis_ff.b = normalize(coat_anisotropy_basis_ff.b);
+    openpbr_apply_anisotropy_rotation(coat_anisotropy_basis_ff, resolved_inputs.coat_anisotropy_rotation_cos_sin);
 
     if (dot(view_direction, resolved_inputs.geometry_coat_basis.n) < 0.0f)  // back-facing coat
         openpbr_invert_basis(coat_anisotropy_basis_ff);

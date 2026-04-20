@@ -23,12 +23,12 @@
 
 #define OpenPBR_BsdfLobeType OPENPBR_UINT32
 OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeNone = 0;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeReflection = 1 << 0;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeTransmission = 1 << 1;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeDiffuse = 1 << 2;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeGlossy = 1 << 3;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeSpecular = 1 << 4;
-OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeVolume = 1 << 5;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeReflection = OpenPBR_BsdfLobeType(1) << 0;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeTransmission = OpenPBR_BsdfLobeType(1) << 1;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeDiffuse = OpenPBR_BsdfLobeType(1) << 2;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeGlossy = OpenPBR_BsdfLobeType(1) << 3;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeSpecular = OpenPBR_BsdfLobeType(1) << 4;
+OPENPBR_CONSTEXPR_GLOBAL OpenPBR_BsdfLobeType OpenPBR_BsdfLobeTypeVolume = OpenPBR_BsdfLobeType(1) << 5;
 
 // Swap reflection and transmission in the OpenPBR_BsdfLobeType bitmask.
 OPENPBR_INLINE_FUNCTION OpenPBR_BsdfLobeType openpbr_swap_reflect_trans_flags(OpenPBR_BsdfLobeType bsdf_lobe_type)
