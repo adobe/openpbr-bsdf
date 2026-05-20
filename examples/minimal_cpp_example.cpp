@@ -31,7 +31,7 @@
 #include <glm/glm.hpp>
 
 // Include OpenPBR main header after including GLM and tweaking any relevant OpenPBR settings.
-#include "openpbr.h"
+#include "openpbr/openpbr.h"
 
 // Standard includes for this example.
 #include <cstdint>
