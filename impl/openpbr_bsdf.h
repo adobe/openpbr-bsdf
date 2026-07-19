@@ -335,11 +335,30 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     // Calculate IORs considering interactions between layers.
     // IOR variables are assumed to be absolute IORs unless explicitly marked as relative IORs.
 
-    const float weighted_specular_ior = openpbr_apply_specular_weight_to_ior(resolved_inputs.specular_ior, resolved_inputs.specular_weight);
+    // The base interface's surrounding medium is the coat when entering a coated surface from the outside,
+    // and the exterior medium otherwise. For a partial coat we linearly interpolate the coat IOR, which,
+    // for low coat roughnesses, results in a nearly linear interpolation of the total energy reflected
+    // from the coat, consistent with the coating lobe with partial presence. Since weighted_coat_ior is
+    // read unconditionally later, it falls back to the exterior IOR when there is no coat. That exterior
+    // IOR is the ambient medium (n_ambient in the spec), which is 1 for air but can differ under nested-
+    // dielectric tracking, so specular_weight=0 index-matches the base to the ambient medium, not to 1.
+    const bool enter_coat = resolved_inputs.coat_weight > 0.0f && !inside;
+    const float weighted_coat_ior =
+        enter_coat ? mix(exterior_ior, resolved_inputs.coat_ior, resolved_inputs.coat_weight) : exterior_ior;
+
+    // specular_weight modulates the base IOR relative to its surrounding medium, so specular_weight=0
+    // index-matches the base to that medium. Under a coat this blends the base IOR toward the coat IOR
+    // (not toward the exterior IOR), which makes the base specular reflection vanish at specular_weight=0
+    // even under a coat. Keeping the final result as an absolute IOR lets reflection, refraction,
+    // and thin film all stay consistent with it.
+    // (Note the resulting side effect that, under a coat, reducing specular_weight also bends refraction
+    // toward the coat IOR, since the base interior medium becomes index-matched to the coat.)
+    const float weighted_specular_ior =
+        weighted_coat_ior * openpbr_apply_specular_weight_to_ior(resolved_inputs.specular_ior / weighted_coat_ior, resolved_inputs.specular_weight);
+
     float relative_ior_for_refraction;         // needs to be set
     float relative_ior_for_trans_reflection;   // needs to be set
     float relative_ior_for_opaque_reflection;  // needs to be set
-    float weighted_coat_ior = exterior_ior;    // can be left at default value except when entering coat from outside
     float relative_coat_ior = 1.0f;            // can be left at default value except when entering coat from outside
     if (inside)
     {
@@ -357,18 +376,14 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
         // Unless we're hitting the surface from the outside,
         // ignore the coat (except the way it tints light passing through it).
         // TODO: Refine how coat is handled when hit from the inside.
-        const bool enter_coat = resolved_inputs.coat_weight > 0.0f && !inside;
         if (enter_coat)
         {
-            // Adjust the base IOR to be relative to the coat IOR.
-            // To handle partial coat, linearly interpolate the coat IOR, which, for low coat
-            // roughnesses, results in a nearly linear interpolation of the total energy reflected
-            // from the coat, consistent with the behavior of the coating lobe with partial presence.
-            // To avoid introducing nonphysical total internal reflection that would be caused by rays
-            // hitting the base surface at implausible grazing angles due to the coat not changing the
-            // ray direction, make sure the base IOR isn't flipped from external to internal reflection.
+            // The base IOR is relative to the coat IOR (weighted_specular_ior already blends the base IOR
+            // toward the coat above). To avoid introducing nonphysical total internal reflection that would
+            // be caused by rays hitting the base surface at implausible grazing angles due to the coat not
+            // changing the ray direction, make sure the base IOR isn't flipped from external to internal
+            // reflection.
             // TODO: Figure out how to apply this or a similar heuristic to thin-film iridescence.
-            weighted_coat_ior = mix(exterior_ior, resolved_inputs.coat_ior, resolved_inputs.coat_weight);
             if (weighted_coat_ior > weighted_specular_ior && weighted_specular_ior >= exterior_ior)
             {
                 // Use the inverted relative IOR to avoid nonphysical total internal reflection.
