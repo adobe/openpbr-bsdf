@@ -24,6 +24,9 @@
 // Most users only need one setting:
 //   - OPENPBR_USE_TEXTURE_LUTS        — 0 (default, self-contained arrays) or 1 (GPU textures)
 //
+// Appearance / behavior:
+//   - OPENPBR_RECIPROCAL_COAT_AND_FUZZ — 0 (default, view-side attenuation) or 1 (symmetric attenuation)
+//
 // Auto-configured; override only if the default is wrong for your target:
 //   - OPENPBR_LANGUAGE_TARGET_*        — auto-detected from compiler macros; set explicitly for Slang
 //
@@ -108,6 +111,36 @@
 #ifndef OPENPBR_SAMPLE_3D_TEXTURE
 #error "OPENPBR_USE_TEXTURE_LUTS = 1 requires OPENPBR_SAMPLE_3D_TEXTURE to be defined before including openpbr.h."
 #endif
+#endif
+
+// ================================================
+// Coat / Fuzz Reciprocity vs. Energy Conservation
+// ================================================
+//
+// The coat and fuzz/sheen layers attenuate the layer beneath them by how much light the
+// interface reflects away (the layer's directional reflectance). This is separate from the
+// layers' absorption and tinting, which color the result, are always applied, and are
+// unaffected by this setting. Applying the reflection-based attenuation on both the view and
+// light sides is symmetric, but darkens the fixed-view white-furnace result because the model
+// does not otherwise redistribute the light-side reflection.
+//
+// OPENPBR_RECIPROCAL_COAT_AND_FUZZ = 0 (Default)
+//   - The light-side reflection term is omitted from base-layer attenuation.
+//   - Improves fixed-view energy conservation for camera-to-light path tracing, but is not
+//     reciprocal and provides no corresponding guarantee for transposed light transport.
+//   - View-side attenuation is unchanged.
+//
+// OPENPBR_RECIPROCAL_COAT_AND_FUZZ = 1
+//   - Applies symmetric view-side/light-side base-layer attenuation.
+//   - This makes the coat layering reciprocal, at the cost of some darkening. The view-dependent
+//     fuzz LTC fit remains non-reciprocal.
+//
+// Example:
+//   #define OPENPBR_RECIPROCAL_COAT_AND_FUZZ 1
+//   #include "openpbr.h"
+//
+#ifndef OPENPBR_RECIPROCAL_COAT_AND_FUZZ
+#define OPENPBR_RECIPROCAL_COAT_AND_FUZZ 0
 #endif
 
 // ===============

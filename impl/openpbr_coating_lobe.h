@@ -45,7 +45,7 @@
 /////////////////
 
 // Represents a coating layer and whatever is beneath it (the aggregate base lobe in this case).
-// Handles energy balance between these layers in a reciprocal way.
+// Handles the energy balance between these layers.
 // When "inside" is true, represents a coated surface hit from the inside;
 // applies a tint but doesn't do much else.
 struct OpenPBR_CoatingLobe_AggregateLobe
@@ -119,7 +119,11 @@ vec3 openpbr_base_layer_scale_outgoing(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONS
                                        const vec3 light_direction)
 {
     const float odotn = dot(light_direction, lobe.normal_ff);
+#if OPENPBR_RECIPROCAL_COAT_AND_FUZZ
     const float out_reflected = openpbr_proportion_reflected(lobe, odotn);
+#else
+    const float out_reflected = 0.0f;
+#endif
     return openpbr_base_layer_scale_one_side(lobe, odotn, out_reflected);
 }
 

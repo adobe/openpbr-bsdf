@@ -369,8 +369,11 @@ float openpbr_base_layer_scale_incoming(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CON
 float openpbr_base_layer_scale_outgoing(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,
                                         const vec3 light_direction_local)
 {
-    const float light_reflected = openpbr_proportion_reflected(lobe, light_direction_local);
-    return 1.0f - light_reflected;
+#if OPENPBR_RECIPROCAL_COAT_AND_FUZZ
+    return 1.0f - openpbr_proportion_reflected(lobe, light_direction_local);
+#else
+    return 1.0f;
+#endif
 }
 
 float openpbr_base_layer_scale_complete(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe) lobe,

@@ -29,10 +29,10 @@ Note: This is shared as a reference implementation, not run as a community-drive
 - **Single-include API:** `#include "openpbr.h"` brings in the complete public API — all types, settings, and the full BSDF.
 - **Multi-language support:** C++, GLSL, CUDA, MSL, or Slang from the same source via a thin interop layer.
 - **Self-contained:** No globals, no hidden dependencies — everything lives alongside the BSDF.
-- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, fast math overrides, conflict-suppression hooks, specialization constants, and custom interop.
+- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, coat/fuzz attenuation, fast math overrides, conflict-suppression hooks, specialization constants, and custom interop.
 - **Fixed-lobe architecture:** One struct per material component.
 - **Energy-conserving:** The BSDF is designed to be energy-conserving for most common configurations, using precomputed LUTs for multiple-scattering compensation.
-- **Reciprocal:** The BSDF satisfies Helmholtz reciprocity for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the exception with transmission. (Note that reciprocity may be traded for better energy conservation in future versions.)
+- **Reciprocal:** The BSDF is reciprocal for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the transmission, coat, and fuzz exceptions.
 
 ---
 
@@ -266,6 +266,8 @@ Actual volume integration — random walks, transmittance queries, shadow rays t
 
 This BSDF is designed for unidirectional path tracing from camera to lights. Bidirectional methods (photon mapping, light tracing) would require an adjoint BSDF with inverted square IOR scaling for transmission.
 
+For the coat and fuzz layers, `OPENPBR_RECIPROCAL_COAT_AND_FUZZ` trades energy conservation against reciprocity — this single-scatter layering can't have both. The default (`0`) omits the light-side reflection term: energy-conserving for camera-to-light transport but not the reverse (it's non-reciprocal). Setting it to `1` applies symmetric two-sided attenuation (at the cost of some darkening): fully reciprocal for the coat, and symmetric base attenuation for the fuzz, whose sheen LTC fit stays non-reciprocal. A light/photon tracer keeps the default's conservation by passing its fixed incident direction as `view`, though those values differ from the camera-direction evaluation.
+
 ### Sampling Return Behavior
 
 `openpbr_sample()` returns `void`, but indicates success/failure through the `pdf` output parameter:
@@ -356,15 +358,15 @@ The CUDA interop header aliases `vec2`/`vec3`/`vec4` to CUDA's `float2`/`float3`
 
 We welcome issues and pull requests, for example:
 
-- Enhancements to the simple demo app (with the goal of keeping it minimal, self-contained, and readable — it illustrates how to use the BSDF API, not how to build a renderer; more complex tests belong in a separate program)
-- Expanded unit tests for evaluation, sampling, and energy conservation
+- A small material-preview program that renders a sphere lit by a simple analytic environment and writes out an image, to visualize a given material configuration (kept separate from the minimal demo, which stays focused on illustrating the API)
+- Expanded unit tests for evaluation, sampling, and energy conservation — for example, a minimal white-furnace test over a range of material configurations
 - Testing of the CUDA backend, which hasn't yet been used in production code
 - Testing of the Slang backend in HLSL-style pipelines (and, if needed, adapting the Slang interop aliases or proposing a dedicated HLSL interop header)
 
 Planned or potential future work:
 
 - Specialization constants currently cover four per-lobe feature toggles (`EnableSheenAndCoat`, `EnableDispersion`, `EnableTranslucency`, `EnableMetallic`), all defaulting to `true`; more may be added (e.g., for thin-film and thin-wall) to cover additional lobes
-- Reciprocity may be traded for better energy conservation in a future version
+- The coat and fuzz layers trade reciprocity for better fixed-view energy conservation by default (see `OPENPBR_RECIPROCAL_COAT_AND_FUZZ`); a similar tradeoff may be extended to other lobes in the future
 - 1D texture sampler support: energy tables with a single dimension are currently stored as thin 2D textures (1 × N); using a real 1D sampler when the platform supports it would reduce sampler overhead
 - Implementing OpenPBR 1.2
 - Continued iteration on the implementation — some naming conventions and API details may evolve as this is live production code
