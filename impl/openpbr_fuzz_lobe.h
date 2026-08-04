@@ -99,25 +99,31 @@ struct OpenPBR_FuzzLobe_CoatingLobe_AggregateLobe
 };
 
 //////////////////////////////////////////////////////
-// LOW-LEVEL MATH HELPER FUNCTIONS FOR DISNEY SHEEN //
+// LOW-LEVEL MATH HELPER FUNCTION FOR DISNEY SHEEN  //
 //////////////////////////////////////////////////////
 
-// Two helper functions for evaluating / sampling from LTCs that are defined
-// based on a standard coordinate system aligned with "phi = 0".
-
-float openpbr_disney_sheen_phi(const vec3 v)
+// Helper function to align the coordinate frame with wo before
+// evaluating / sampling from LTCs, since they are defined based on a
+// standard coordinate system aligned with "phi = 0".
+vec3 openpbr_disney_sheen_rotate_vector(const vec3 v, const vec2 wo_xy)
 {
-    float p = atan2(v.y, v.x);
-    if (p < 0.0f)
-        p += OpenPBR_TwoPi;
-    return p;
-}
+    const float r2 = dot(wo_xy, wo_xy);
+    if (r2 == 0.0f) {
+        return v;
+    }
+    const float inv_r = OPENPBR_FAST_RCP_SQRT(r2);
+    const float sin_phi = wo_xy.y * inv_r;
+    const float cos_phi = wo_xy.x * inv_r;
 
-vec3 openpbr_disney_sheen_rotate_vector(const vec3 v, const vec3 axis, const float angle)
-{
-    const float s = sin(angle);
-    const float c = cos(angle);
-    return v * c + axis * dot(v, axis) * (1.0f - c) + s * cross(axis, v);
+    // The original rotation formula is:
+    // wi * cos(phi) + uz * dot(wi, uz) * (1.0 - cos(phi)) + sin(phi) * cross(uz, wi);
+    //
+    // - With phi = atan(wo.y, wo.x), cos(phi) and sin(phi) simplify to
+    //   wo.x / length(wo.xy) and wo.y / length(wo.xy)
+    // - uz * dot(wi, uz) simplifies to vec3(0.0, 0.0, wi.z)
+    // - cross(uz, wi) simplifies to vec3(-wi.y, wi.x, 0.0)
+    // - Finally the XY components just become:
+    return vec3(cos_phi * v.x + sin_phi * -v.y, cos_phi * v.y + sin_phi * v.x, v.z);
 }
 
 //////////////////////////////////////////////////////
@@ -266,8 +272,7 @@ vec3 openpbr_disney_sheen_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenP
         return vec3(0.0f);
 
     // Rotate coordinate frame to align with incident direction wo_local.
-    const float phi_std = openpbr_disney_sheen_phi(wo_local);
-    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec3(0.0f, 0.0f, 1.0f), -phi_std);
+    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec2(wo_local.x, -wo_local.y));
 
     // Evaluate LTC distribution in aligned coordinates.
     const vec3 ltc_coeffs = openpbr_disney_sheen_fetch_coeffs(lobe, wo_local);
@@ -311,8 +316,7 @@ bool openpbr_disney_sheen_sample_f(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_RE
     const vec3 wi_std_local = openpbr_disney_sheen_sample_ltc(openpbr_disney_sheen_fetch_coeffs(lobe, wo_local), rand);
 
     // Rotate coordinate frame based on incident direction wo_local.
-    const float phi_std = openpbr_disney_sheen_phi(wo_local);
-    wi_local = openpbr_disney_sheen_rotate_vector(wi_std_local, vec3(0.0f, 0.0f, 1.0f), +phi_std);
+    wi_local = openpbr_disney_sheen_rotate_vector(wi_std_local, vec2(wo_local.x, wo_local.y));
 
     if (!openpbr_are_in_same_hemisphere_local(wo_local, wi_local))
         return false;
@@ -325,14 +329,14 @@ float openpbr_disney_sheen_pdf(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(Op
                                const vec3 wo_local,
                                const vec3 wi_local)
 {
+    // PDF=0 if wi or wo are below the horizon.
     const float cos_theta_o = openpbr_get_cos_theta_local(wo_local);
     const float cos_theta_i = openpbr_get_cos_theta_local(wi_local);
     if (cos_theta_o <= 0.0f || cos_theta_i <= 0.0f)
         return 0.0f;
 
     // Rotate coordinate frame to align with incident direction wo_local.
-    const float phi_std = openpbr_disney_sheen_phi(wo_local);
-    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec3(0.0f, 0.0f, 1.0f), -phi_std);
+    const vec3 wi_std_local = openpbr_disney_sheen_rotate_vector(wi_local, vec2(wo_local.x, -wo_local.y));
 
     // Evaluate LTC distribution in aligned coordinates.
     return openpbr_disney_sheen_eval_ltc(wi_std_local, openpbr_disney_sheen_fetch_coeffs(lobe, wo_local));
