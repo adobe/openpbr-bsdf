@@ -42,12 +42,23 @@
 #define OPENPBR_CONSTEXPR_GLOBAL static constexpr constant inline
 
 // Constexpr function qualifiers.
-// OPENPBR_GENERAL_CONSTEXPR_FUNCTION is for scalar-only functions.
-// OPENPBR_LIMITED_CONSTEXPR_FUNCTION is for functions that use vector types (float2/float3/float4).
-// Metal SIMD vector types are not reliably constexpr-capable across toolchains,
-// so OPENPBR_LIMITED_CONSTEXPR_FUNCTION remains non-constexpr.
-#define OPENPBR_GENERAL_CONSTEXPR_FUNCTION static constexpr
-#define OPENPBR_LIMITED_CONSTEXPR_FUNCTION static
+// OPENPBR_CONSTEXPR_FUNCTION is for scalar-only functions.
+// OPENPBR_MAYBE_CONSTEXPR_FUNCTION is for functions that use vector types (float2/float3/float4);
+// Metal SIMD vector types are not reliably constexpr-capable across toolchains, so it is non-constexpr.
+#define OPENPBR_CONSTEXPR_FUNCTION static constexpr
+
+// Vector-typed qualifiers. MSL constant-address-space globals require compile-time initializers, and
+// MSL vector constants are constexpr-constructible, so the constant forms keep constexpr. #ifndef-
+// guarded so an OPENPBR_USE_CUSTOM_VEC_TYPES host whose vector types differ can predefine them.
+#ifndef OPENPBR_MAYBE_CONSTEXPR_LOCAL
+#define OPENPBR_MAYBE_CONSTEXPR_LOCAL constexpr
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_GLOBAL
+#define OPENPBR_MAYBE_CONSTEXPR_GLOBAL static constexpr constant inline
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+#define OPENPBR_MAYBE_CONSTEXPR_FUNCTION static
+#endif
 
 // Function inline specifier.
 // MSL supports inline functions.

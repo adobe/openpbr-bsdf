@@ -209,6 +209,10 @@
 //     to avoid redefinition or ambiguous-overload errors.
 //   - In C++/GLM mode, GLM functions that take GLM-typed arguments remain accessible
 //     through argument-dependent lookup (ADL) even without the using-declarations.
+//   - If your vector types' constexpr capability differs from GLM's, you may predefine the
+//     vector-typed qualifiers OPENPBR_MAYBE_CONSTEXPR_{LOCAL,GLOBAL,FUNCTION} before including
+//     OpenPBR; the C++/CUDA/MSL/Slang backends leave them #ifndef-guarded so your definitions take
+//     effect (GLSL's vec is a built-in keyword, so this doesn't apply there).
 //
 // Example:
 //   #define OPENPBR_USE_CUSTOM_VEC_TYPES 1
@@ -230,7 +234,9 @@
 // Most renderers should leave this at 0 and use OPENPBR_USE_CUSTOM_SATURATE /
 // OPENPBR_USE_CUSTOM_VEC_TYPES for targeted suppressions. Set this to 1 only if you need
 // to replace the entire interop layer — e.g., your renderer already provides every macro
-// OpenPBR requires. No validation is performed when this is 1.
+// OpenPBR requires (including the vector-typed OPENPBR_MAYBE_CONSTEXPR_{LOCAL,GLOBAL,FUNCTION}
+// qualifiers — see interop/openpbr_interop_cpp.h for what each macro family/target means). No
+// validation is performed when this is 1.
 //
 // Example:
 //   #define OPENPBR_USE_CUSTOM_INTEROP 1

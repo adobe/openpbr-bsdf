@@ -44,7 +44,7 @@
 //
 // ================================================================================================================
 
-OPENPBR_CONSTEXPR_GLOBAL vec3 OpenPBR_LTC_Array[OpenPBR_LTCTableSize * OpenPBR_LTCTableSize] = {
+OPENPBR_MAYBE_CONSTEXPR_GLOBAL vec3 OpenPBR_LTC_Array[OpenPBR_LTCTableSize * OpenPBR_LTCTableSize] = {
 #include "openpbr_ltc_data.h"
 };
 

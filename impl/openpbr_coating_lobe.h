@@ -144,7 +144,7 @@ float openpbr_coat_reflection_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_C
 
     // TODO: Take the real path throughput into account (for both standalone lobes),
     //       either by saving it in the lobe struct or by passing it in.
-    OPENPBR_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
+    OPENPBR_MAYBE_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
 
     // Here we can use lobe.in_reflected instead of calling estimate_lobe_contribution
     // because we know the inner details of the coat reflection lobe.

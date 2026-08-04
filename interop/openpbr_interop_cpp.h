@@ -49,16 +49,37 @@
 #define OPENPBR_INOUT(type) type&
 #define OPENPBR_CONST_REF(type) const type&
 
-// Constant declaration macros.
-// C++ uses constexpr for compile-time constants.
-// Global constants use static inline constexpr for ODR safety.
+// Compile-time-constant and constexpr-function qualifier macros, in two families:
+//
+//   - OPENPBR_CONSTEXPR_{LOCAL,GLOBAL,FUNCTION} — scalar declarations; always constexpr.
+//   - OPENPBR_MAYBE_CONSTEXPR_{LOCAL,GLOBAL,FUNCTION} — declarations that involve vector types, which
+//     are not reliably constexpr-constructible on every backend/config: Metal SIMD vectors are never
+//     constexpr for functions, and GLM disables constexpr on its vec<> constructors under SIMD
+//     (GLM_FORCE_INTRINSICS / SSE* / AVX* / NEON / ARMv8). "MAYBE" = constexpr where the backend
+//     allows it, otherwise a plain immutable const / static declaration. Use these for any
+//     declaration whose type — or whose parameters — is a vector type (even if it returns a scalar,
+//     e.g. openpbr_min3).
+//
+// On this C++ backend the "maybe" tracks GLM's own GLM_CONSTEXPR (<glm/detail/setup.hpp>, guaranteed
+// defined via the GLM_VERSION guard above): `constexpr` when GLM allows it, empty under SIMD. `const`
+// is kept unconditionally so the declaration stays immutable either way. Each macro is #ifndef-guarded
+// so a host supplying its own vector types (OPENPBR_USE_CUSTOM_VEC_TYPES) whose constexpr capability
+// differs from GLM's can predefine them.
+//
+// Target suffix: _LOCAL = function-local (block-scope) constant; _GLOBAL = namespace-scope constant
+// (adds `static inline` for header ODR safety); _FUNCTION = a function definition.
 #define OPENPBR_CONSTEXPR_LOCAL constexpr
 #define OPENPBR_CONSTEXPR_GLOBAL static inline constexpr
-
-// Constexpr function qualifiers.
-// C++ supports constexpr functions directly.
-#define OPENPBR_GENERAL_CONSTEXPR_FUNCTION static constexpr
-#define OPENPBR_LIMITED_CONSTEXPR_FUNCTION static constexpr
+#define OPENPBR_CONSTEXPR_FUNCTION static constexpr
+#ifndef OPENPBR_MAYBE_CONSTEXPR_LOCAL
+#define OPENPBR_MAYBE_CONSTEXPR_LOCAL const GLM_CONSTEXPR
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_GLOBAL
+#define OPENPBR_MAYBE_CONSTEXPR_GLOBAL static inline const GLM_CONSTEXPR
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+#define OPENPBR_MAYBE_CONSTEXPR_FUNCTION static inline GLM_CONSTEXPR
+#endif
 
 // Function inline specifier.
 // Use inline to avoid multiple-definition issues across translation units.
