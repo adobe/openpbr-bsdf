@@ -81,50 +81,34 @@ float openpbr_eval_aniso_ggx(const vec3 n, const vec2 alpha)
 
 // Sample VNDF of anisotropic GGX with Smith masking function.
 // Input and output vectors are in local (z-up) space.
-// Based on the technique described in the paper "Sampling the GGX Distribution of Visible Normals" (http://jcgt.org/published/0007/04/01/).
+// Based on the technique described in the paper "Sampling Visible GGX Normals with Spherical Caps" (https://arxiv.org/abs/2306.05044).
 vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, const vec2 rand)
 {
     // Transform ellipsoid configuration into sphere configuration.
     const vec3 ellipsoid_to_hemisphere = vec3(alpha.x, alpha.y, 1.0f);
     const vec3 incoming_hemisphere = openpbr_fast_normalize(ellipsoid_to_hemisphere * incoming);
-    const float incoming_hemisphere_xy_length_squared = openpbr_square(incoming_hemisphere.x) + openpbr_square(incoming_hemisphere.y);
-    // Construct an orthonormal basis with transformed incoming direction as normal.
-    vec3 tangent;
-    if (incoming_hemisphere_xy_length_squared > 0.0f)
-    {
-        const float incoming_hemisphere_xy_length_inverse = openpbr_fast_rcp_sqrt(incoming_hemisphere_xy_length_squared);
-        tangent = vec3(-incoming_hemisphere.y, incoming_hemisphere.x, 0.0f) * incoming_hemisphere_xy_length_inverse;
-    }
-    else
-    {
-        tangent = vec3(1.0f, 0.0f, 0.0f);
-    }
-    const vec3 bitangent = cross(incoming_hemisphere, tangent);
-    // Uniformly sample a disk.
-    const float radius = openpbr_fast_sqrt(rand.x);
-    const float angle = OpenPBR_TwoPi * rand.y;
-    const float sin_angle = sin(angle);
-    const float cos_angle = cos(angle);
-    const float bitangent_component_unscaled = radius * sin_angle;
-    const float tangent_component = radius * cos_angle;
-    // Remap vertical coordinate to warp disk into projected hemisphere.
-    const float scale = 0.5f * (1.0f + incoming_hemisphere.z);
-    const float bitangent_component =
-        (1.0f - scale) * openpbr_fast_sqrt(1.0f - openpbr_square(tangent_component)) + scale * bitangent_component_unscaled;
-    // Project point on projected hemisphere back onto hemisphere.
-    float normal_component_squared = 1.0f - (openpbr_square(tangent_component) + openpbr_square(bitangent_component));
-    // Prevent negative number due to rounding error.
-    if (normal_component_squared < 0.0f)
-    {
-        normal_component_squared = 0.0f;
-    }
-    vec3 microfacet_normal_hemisphere =
-        tangent * tangent_component + bitangent * bitangent_component + incoming_hemisphere * openpbr_fast_sqrt(normal_component_squared);
-    // Prevent microfacet normal below ground due to rounding error.
-    if (microfacet_normal_hemisphere.z < 0.0f)
-    {
-        microfacet_normal_hemisphere.z = 0.0f;
-    }
+
+    // Prevent fast-normalize overshoot from leading to numerical issues in the sqrt below with one_plus_z < 0.
+    const float cos_incoming = min(incoming_hemisphere.z, 1.0f);
+
+    // Sample a spherical cap in (-cos_incoming, 1].
+    const float angle = OpenPBR_TwoPi * rand.x;
+
+    // In the paper, z = fma(1.0f - rand.y, 1.0f + incoming_hemisphere.z, -incoming_hemisphere.z)
+    // But (1.0 - z * z) is numerically unstable when z is near +/-1.0 (i.e. near the cap poles).
+    // Using the identity (1 - z * z) == (1 + z) * (1 - z) gives a more stable result.
+    const float one_plus_cos = 1.0f + cos_incoming;
+    const float cos_incoming_plus_z = (1.0f - rand.y) * one_plus_cos;
+    const float one_plus_z = cos_incoming_plus_z + (1.0f - cos_incoming);
+    const float one_minus_z = rand.y * one_plus_cos;
+    const float tangent_plane_component = openpbr_fast_sqrt(one_plus_z * one_minus_z);
+
+    // Compute halfway direction.
+    const vec3 microfacet_normal_hemisphere = vec3(
+        tangent_plane_component * cos(angle) + incoming_hemisphere.x,
+        tangent_plane_component * sin(angle) + incoming_hemisphere.y,
+        cos_incoming_plus_z);
+
     // The inverse transformation for the sampled normal is the same
     // as the forward transformation for the incoming direction.
     return openpbr_fast_normalize(ellipsoid_to_hemisphere * microfacet_normal_hemisphere);
