@@ -77,19 +77,17 @@ openpbr_complex openpbr_snell_cos_unified(const float cos_theta_i, const float e
     return cos_theta_t;
 }
 
-// Unified Fresnel amplitude coefficients (s/p), valid for dielectric or conductor eta_t
-// Returns complex r and t, and complex cos_theta_t
-// Handles total internal reflection (TIR) by returning complex coefficients with phase information
-void openpbr_compute_fresnel_unified_polarized_amplitude(
+// Unified Fresnel reflection amplitudes (s/p) for dielectric or conductor eta_t.
+// Complex coefficients preserve phase under total internal reflection.
+// Film-to-base transmission amplitudes t23 do not enter the Airy summation.
+void openpbr_compute_fresnel_unified_polarized_reflection_amplitude(
     const float cos_theta_i,
     const float eta_i,
     const openpbr_complex eta_t,  // eta_t = n_t + i * k_t (complex IOR for conductors, or n_t + i*0 for dielectrics)
-    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedComplex) r,
-    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedComplex) t,
-    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(openpbr_complex) cos_theta_t)
+    OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_OUT(OpenPBR_PolarizedComplex) r)
 {
     // Apply Snell's Law to compute complex cos(theta_t), which handles TIR by producing complex angles
-    cos_theta_t = openpbr_snell_cos_unified(cos_theta_i, eta_i, eta_t);
+    const openpbr_complex cos_theta_t = openpbr_snell_cos_unified(cos_theta_i, eta_i, eta_t);
 
     // Calculate intermediate products used in Fresnel equations
     const openpbr_complex eta_i_cos_theta_i = openpbr_complex(eta_i * cos_theta_i, 0.0f);
@@ -97,24 +95,17 @@ void openpbr_compute_fresnel_unified_polarized_amplitude(
     const openpbr_complex eta_t_cos_theta_i = openpbr_complex_scalar_multiply(cos_theta_i, eta_t);
     const openpbr_complex eta_i_cos_theta_t = openpbr_complex_scalar_multiply(eta_i, cos_theta_t);
 
-    // Transmission numerator is the same for both s and p polarizations
-    const openpbr_complex t_numerator = openpbr_complex(2.0f * eta_i * cos_theta_i, 0.0f);
-
     // For s-polarization:
     // r_s = (eta_i * cos_theta_i - eta_t * cos_theta_t) / (eta_i * cos_theta_i + eta_t * cos_theta_t)
-    // t_s = (2 * eta_i * cos_theta_i) / (eta_i * cos_theta_i + eta_t * cos_theta_t)
     const openpbr_complex r_s_numerator = openpbr_complex_subtract(eta_i_cos_theta_i, eta_t_cos_theta_t);
     const openpbr_complex denominator_s = openpbr_complex_add(eta_i_cos_theta_i, eta_t_cos_theta_t);
     r.s = openpbr_complex_divide(r_s_numerator, denominator_s, OpenPBR_MinDenomMag, openpbr_complex(1.0f, 0.0f));
-    t.s = openpbr_complex_divide(t_numerator, denominator_s, OpenPBR_MinDenomMag, openpbr_complex(0.0f, 0.0f));
 
     // For p-polarization:
     // r_p = (eta_t * cos_theta_i - eta_i * cos_theta_t) / (eta_t * cos_theta_i + eta_i * cos_theta_t)
-    // t_p = (2 * eta_i * cos_theta_i) / (eta_t * cos_theta_i + eta_i * cos_theta_t)
     const openpbr_complex r_p_numerator = openpbr_complex_subtract(eta_t_cos_theta_i, eta_i_cos_theta_t);
     const openpbr_complex denominator_p = openpbr_complex_add(eta_t_cos_theta_i, eta_i_cos_theta_t);
     r.p = openpbr_complex_divide(r_p_numerator, denominator_p, OpenPBR_MinDenomMag, openpbr_complex(1.0f, 0.0f));
-    t.p = openpbr_complex_divide(t_numerator, denominator_p, OpenPBR_MinDenomMag, openpbr_complex(0.0f, 0.0f));
 }
 
 // Compute amplitude Fresnel coefficients for dielectrics (outputs PolarizedFloat)
@@ -227,23 +218,22 @@ openpbr_complex openpbr_compute_gulbrandsen_n_and_k(const float r, const float g
 
 // Perform the Airy summation for a single polarization and wavelength
 // This is equivalent to Equation 3 in the Belcour and Barla paper
-float openpbr_compute_airy_reflectance(const float r12,            // Amplitude reflection coefficient at film-to-exterior interface
-                                       const float t12,            // Amplitude transmission coefficient at film-to-exterior interface
-                                       const float r21,            // Amplitude reflection coefficient from film to exterior (reverse direction)
-                                       const float t21,            // Amplitude transmission coefficient from film to exterior
-                                       const openpbr_complex r23,  // Complex amplitude reflection coefficient at base-to-film interface
-                                       const float delta_phi       // Phase shift due to optical path difference
+float openpbr_compute_airy_reflectance(const float r12,            // Exterior-to-film amplitude reflection coefficient
+                                       const float t12,            // Exterior-to-film amplitude transmission coefficient
+                                       const float r21,            // Film-to-exterior amplitude reflection coefficient
+                                       const float t21,            // Film-to-exterior amplitude transmission coefficient
+                                       const openpbr_complex r23,  // Film-to-base complex amplitude reflection coefficient
+                                       const openpbr_complex exp_i_delta_phi  // e^(i * delta_phi)
 )
 {
-    // Exponential term e^(i * delta_phi)
-    const openpbr_complex exp_i_delta_phi = openpbr_complex_exp_i(delta_phi);
+    const openpbr_complex r23_exp = openpbr_complex_multiply(r23, exp_i_delta_phi);
 
     // Numerator: t12 * r23 * t21 * e^(i * delta_phi)
-    const openpbr_complex numerator = openpbr_complex_scalar_multiply(t12 * t21, openpbr_complex_multiply(r23, exp_i_delta_phi));
+    const openpbr_complex numerator = openpbr_complex_scalar_multiply(t12 * t21, r23_exp);
 
     // Denominator: 1 - r21 * r23 * e^(i * delta_phi)
     const openpbr_complex denominator =
-        openpbr_complex_subtract(openpbr_complex(1.0f, 0.0f), openpbr_complex_scalar_multiply(r21, openpbr_complex_multiply(r23, exp_i_delta_phi)));
+        openpbr_complex_subtract(openpbr_complex(1.0f, 0.0f), openpbr_complex_scalar_multiply(r21, r23_exp));
 
     // Total complex reflection coefficient: r_total = r12 + numerator / denominator
     // This line completes the evaluation of Equation 3 from the Belcour and Barla paper
@@ -257,19 +247,21 @@ float openpbr_compute_airy_reflectance(const float r12,            // Amplitude 
 
 // Helper function to compute thin-film reflectance for a given base material
 float openpbr_compute_combined_reflectance_for_thin_film_and_base(
-    const OpenPBR_PolarizedFloat r12,    // Amplitude reflection coefficients at film-to-exterior interface (s and p)
-    const OpenPBR_PolarizedFloat t12,    // Amplitude transmission coefficients at film-to-exterior interface (s and p)
-    const OpenPBR_PolarizedFloat r21,    // Amplitude reflection coefficients from film to exterior (reverse direction) (s and p)
-    const OpenPBR_PolarizedFloat t21,    // Amplitude transmission coefficients from film to exterior (s and p)
-    const OpenPBR_PolarizedComplex r23,  // Complex amplitude reflection coefficients at base-to-film interface (s and p)
+    const OpenPBR_PolarizedFloat r12,    // Exterior-to-film amplitude reflection coefficients (s and p)
+    const OpenPBR_PolarizedFloat t12,    // Exterior-to-film amplitude transmission coefficients (s and p)
+    const OpenPBR_PolarizedFloat r21,    // Film-to-exterior amplitude reflection coefficients (s and p)
+    const OpenPBR_PolarizedFloat t21,    // Film-to-exterior amplitude transmission coefficients (s and p)
+    const OpenPBR_PolarizedComplex r23,  // Film-to-base complex amplitude reflection coefficients (s and p)
     const float delta_phi                // Phase shift due to optical path difference
 )
 {
+    const openpbr_complex exp_i_delta_phi = openpbr_complex_exp_i(delta_phi);
+
     // S-polarization
-    const float reflectance_s = openpbr_compute_airy_reflectance(r12.s, t12.s, r21.s, t21.s, r23.s, delta_phi);
+    const float reflectance_s = openpbr_compute_airy_reflectance(r12.s, t12.s, r21.s, t21.s, r23.s, exp_i_delta_phi);
 
     // P-polarization
-    const float reflectance_p = openpbr_compute_airy_reflectance(r12.p, t12.p, r21.p, t21.p, r23.p, delta_phi);
+    const float reflectance_p = openpbr_compute_airy_reflectance(r12.p, t12.p, r21.p, t21.p, r23.p, exp_i_delta_phi);
 
     // Average over polarizations to get unpolarized reflectance
     const float reflectance = 0.5f * (reflectance_s + reflectance_p);
@@ -288,7 +280,7 @@ vec3 openpbr_compute_dielectric_reflectance(const OpenPBR_PolarizedFloat r12,
                                             const vec3 eta_base,  // Refractive index(es) of the dielectric base
                                             const bool enable_dispersion)
 {
-    // Compute Fresnel coefficients at base-to-film interface for dielectric base
+    // Compute Fresnel coefficients for incidence from the film onto the dielectric base.
     // Note: Must keep complex r23 to preserve phase under TIR at the base interface
     OpenPBR_PolarizedComplex r23[OpenPBR_NumRgbChannels];
 
@@ -298,12 +290,9 @@ vec3 openpbr_compute_dielectric_reflectance(const OpenPBR_PolarizedFloat r12,
         // Otherwise, calculate the coefficients for only the first channel and reuse them for all channels
         if (enable_dispersion || color_channel == 0)
         {
-            OpenPBR_PolarizedComplex t23_unused;
-            openpbr_complex cos_theta_t_base_unused;
-
             // Unified complex Fresnel (dielectric base => eta_t is real, pass as complex(real, 0))
-            openpbr_compute_fresnel_unified_polarized_amplitude(
-                cos_theta_t_film, eta_film, openpbr_complex(eta_base[color_channel], 0.0f), r23[color_channel], t23_unused, cos_theta_t_base_unused);
+            openpbr_compute_fresnel_unified_polarized_reflection_amplitude(
+                cos_theta_t_film, eta_film, openpbr_complex(eta_base[color_channel], 0.0f), r23[color_channel]);
         }
         else
         {
@@ -343,9 +332,7 @@ vec3 openpbr_compute_metal_reflectance(const OpenPBR_PolarizedFloat r12,
 
         // Compute Fresnel coefficients at the film-metal interface using unified function
         OpenPBR_PolarizedComplex r23_metal;
-        OpenPBR_PolarizedComplex t23_unused;
-        openpbr_complex cos_theta_t_base_unused;
-        openpbr_compute_fresnel_unified_polarized_amplitude(cos_theta_t_film, eta_film, n_and_k, r23_metal, t23_unused, cos_theta_t_base_unused);
+        openpbr_compute_fresnel_unified_polarized_reflection_amplitude(cos_theta_t_film, eta_film, n_and_k, r23_metal);
 
         // Compute and store reflectance for this color channel
         reflectance_metal[color_channel] =
@@ -401,10 +388,10 @@ openpbr_thin_film_and_base_reflectance(const float cos_theta_i,       // Cosine 
     if (!(enable_dielectric || enable_metal))
         return results;
 
-    // Compute Fresnel coefficients at film-to-exterior interface
+    // Compute Fresnel coefficients for incidence from the exterior into the film.
     float cos_theta_t_film;
-    OpenPBR_PolarizedFloat r12;  // Amplitude reflection coefficients at film-to-exterior interface
-    OpenPBR_PolarizedFloat t12;  // Amplitude transmission coefficients at film-to-exterior interface
+    OpenPBR_PolarizedFloat r12;
+    OpenPBR_PolarizedFloat t12;
     openpbr_compute_fresnel_dielectric_polarized_amplitude(cos_theta_i, eta_exterior, eta_film, r12, t12, cos_theta_t_film);
 
     // Check for total internal reflection on the outside of the film
@@ -425,7 +412,7 @@ openpbr_thin_film_and_base_reflectance(const float cos_theta_i,       // Cosine 
     r21.p = -r12.p;
 
     // Transmission coefficients for reverse direction
-    // t21 is derived from r12 using the appropriate reciprocity relation
+    // t21 is derived from t12 using the appropriate reciprocity relation
     // Note that amplitude transmission coefficients can be greater than one due to refraction
     OpenPBR_PolarizedFloat t21;
     const float safe_cos_theta_i = max(cos_theta_i, OpenPBR_MinDenomMag);  // Prevent numerical issues at grazing incidence where cos_theta_i -> 0

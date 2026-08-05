@@ -22,7 +22,7 @@
 // A complex number is represented by a vec2
 // The vec2's first component represents the real component
 // The vec2's second component represents the imaginary component
-// The constructor complex(x, y) can then be used to create a complex number
+// The constructor openpbr_complex(x, y) can then be used to create a complex number
 #define openpbr_complex vec2
 
 // Complex negate

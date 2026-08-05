@@ -111,7 +111,7 @@ vec3 openpbr_disney_sheen_rotate_vector(const vec3 v, const vec2 wo_xy)
     if (r2 == 0.0f) {
         return v;
     }
-    const float inv_r = OPENPBR_FAST_RCP_SQRT(r2);
+    const float inv_r = openpbr_fast_rcp_sqrt(r2);
     const float sin_phi = wo_xy.y * inv_r;
     const float cos_phi = wo_xy.x * inv_r;
 
@@ -157,16 +157,18 @@ float openpbr_disney_sheen_eval_ltc(const vec3 wi_local, const vec3 ltc_coeffs)
 
     const float a_inv = ltc_coeffs[0];
     const float b_inv = ltc_coeffs[1];
-    vec3 wi_original_local = vec3(a_inv * wi_local.x + b_inv * wi_local.z, a_inv * wi_local.y, wi_local.z);
-    const float len = length(wi_original_local);
-    if (len == 0.0f)
+    const vec3 wi_original_local = vec3(a_inv * wi_local.x + b_inv * wi_local.z, a_inv * wi_local.y, wi_local.z);
+
+    // Since wi_original_local.z == wi_local.z, the cosine pdf and LTC Jacobian reduce to
+    //     RcpPi * max(0, wi_local.z) * a_inv^2 / len_squared^2.
+    const float z = max(0.0f, wi_local.z);
+    const float len_squared = dot(wi_original_local, wi_original_local);
+    if (len_squared == 0.0f || a_inv == 0.0f || z == 0.0f)
         return 0.0f;
-    wi_original_local /= len;
 
-    const float det = a_inv * a_inv;
-    const float jacobian = det / (len * len * len);
-
-    return openpbr_compute_pdf_for_sample_unit_hemisphere_cosine(wi_original_local) * jacobian;
+    // This factorization preserves representable PDFs for tiny grazing cosines.
+    const float a_inv_over_len_squared = a_inv / len_squared;
+    return OpenPBR_RcpPi * (z * a_inv_over_len_squared) * a_inv_over_len_squared;
 }
 
 // Sample from the LTC distribution in its default coordinate system.

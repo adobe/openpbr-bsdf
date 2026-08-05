@@ -22,9 +22,9 @@
 // g++ -std=c++17 -I/path/to/openpbr-bsdf -I/path/to/glm minimal_cpp_example.cpp -o minimal_cpp_example && ./minimal_cpp_example
 //
 // Expected output:
-// Sampled direction : (-0.683459, 0.109225, 0.721771)
-// Throughput weight : (0.615105, 0.400597, 0.314794)
-// Sampling PDF      : 0.520167
+// Sampled direction : (-0.706433, 0.0235995, 0.707387)
+// Throughput weight : (0.843946, 0.606481, 0.511495)
+// Sampling PDF      : 0.459982
 // Lobe type         : 9
 
 // Include GLM before openpbr.h so the C++ interop layer can use GLM types and functions.

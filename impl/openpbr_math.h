@@ -158,7 +158,7 @@ OPENPBR_INLINE_FUNCTION float openpbr_cube(const float x)
 
 OPENPBR_INLINE_FUNCTION float openpbr_three_halves_power(const float x)
 {
-    return sqrt(openpbr_cube(x));
+    return x * sqrt(x);
 }
 
 #endif

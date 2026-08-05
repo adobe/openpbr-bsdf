@@ -67,7 +67,8 @@ struct OpenPBR_PreparedBsdf
 bool openpbr_needs_rgb_wavelengths(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_ResolvedInputs) resolved_inputs)
 {
     const bool needs_rgb_wavelengths_for_dispersion = OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion) &&
-                                                      resolved_inputs.transmission_dispersion_scale > 0.0f && resolved_inputs.base_metalness < 1.0f;
+                                                      resolved_inputs.transmission_dispersion_scale > 0.0f &&
+                                                      resolved_inputs.transmission_dispersion_abbe_number > 0.0f && resolved_inputs.base_metalness < 1.0f;
     const float thin_film_thickness_nm = resolved_inputs.thin_film_thickness * 1000.0f;
     const bool needs_rgb_wavelengths_for_thin_film = resolved_inputs.thin_film_weight > 0.0f && thin_film_thickness_nm > 0.0f;
     return needs_rgb_wavelengths_for_dispersion || needs_rgb_wavelengths_for_thin_film;
@@ -510,7 +511,9 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Calculate the reflectance from the inside of the coat for perfectly specular and perfectly diffuse underlying surfaces.
 
-    // These formulas correspond to Equation 67 and Equation 66 from the OpenPRB spec (v1.1):
+    // K_s and K_r are the smooth-base and rough-base internal diffuse reflection coefficients from the OpenPBR
+    // v1.1.1 spec (equations [internal_diffuse_reflection_coefficient_for_smooth_base] and
+    // [internal_diffuse_reflection_coefficient_for_rough_base]):
     const float K_s = openpbr_average_fresnel(relative_coat_ior);  // TODO: Use directional Fresnel (of exterior coat reflection).
     const float K_r = 1.0f - (1.0f - openpbr_average_fresnel(relative_coat_ior)) / openpbr_square(relative_coat_ior);
 
@@ -523,7 +526,8 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     const float specularity_base = specularity_dielectric + specularity_metal;
     const float effective_roughness_base = mix(1.0f, adjusted_specular_roughness, specularity_base);
 
-    // This formula corresponds to Equation 68 from the OpenPRB spec (v1.1):
+    // Blend K_s and K_r by the effective base roughness, per the OpenPBR v1.1.1 spec
+    // (equation [internal_diffuse_reflection_coefficient_for_general_base]):
     const float K = mix(K_s, K_r, effective_roughness_base);
 
     // Estimate the base surface albedo.
@@ -536,8 +540,15 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
 
     // Calculate the final coat darkening factor.
 
-    // These formulas correspond to Equation 65 and Equation 71 from the OpenPRB spec (v1.1):
+    // Delta is the darkening factor of the interfaced-Lambertian model, per the released OpenPBR v1.1.1 spec
+    // (equation [general_darkening_formula]). The first-order coat absorption (coat_color) is applied
+    // separately and view-dependently by the coating lobe, so it does not appear in this factor.
+    // Note: the upcoming v1.2 spec couples the coat absorption into this denominator
+    // (equation [general_darkening_formula_with_absorption]): Delta = (1 - K) / (1 - K * E_b * coat_color),
+    // which is a no-op when coat_color is white. Switch to that form when moving this implementation to v1.2.
     const vec3 Delta = vec3(1.0f - K) / (vec3(1.0f) - E_b * K);
+
+    // Modulate by the coat presence and the coat_darkening parameter: lerp(1, Delta, coat_weight * coat_darkening).
     const vec3 modulated_coat_darkening = mix(vec3(1.0f), Delta, resolved_inputs.coat_weight * resolved_inputs.coat_darkening);
 
     // Create specular and diffuse reflection lobes.
@@ -600,8 +611,10 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     vec3 relative_ior_for_trans_reflection_with_dispersion;
     vec3 relative_ior_for_opaque_reflection_with_dispersion;
 
+    // Require a positive Abbe number: a zero Abbe number yields zero dispersion, which
+    // openpbr_dispersion_adjusted_ior rejects. (Otherwise a subset of openpbr_needs_rgb_wavelengths.)
     if (OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableDispersion) && resolved_inputs.transmission_dispersion_scale > 0.0f &&
-        resolved_inputs.base_metalness < 1.0f)  // dispersion check (subset of openpbr_needs_rgb_wavelengths)
+        resolved_inputs.transmission_dispersion_abbe_number > 0.0f && resolved_inputs.base_metalness < 1.0f)
     {
         dispersion = openpbr_safe_divide(
             20.0f,
@@ -645,7 +658,7 @@ void openpbr_prepare_lobes(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPB
     const float thin_wall_aware_cos_theta =
         resolved_inputs.geometry_thin_walled
             ? abs(cos_theta)
-            : cos_theta;  // cos(theta) should always positive for thin-walled surfaces since we're always entering from the front
+            : cos_theta;  // A thin wall has no interior, so abs() treats either geometric side as front-facing (positive cosine).
 
     const vec3 final_transmission_tint = openpbr_compute_final_transmission_tint(
         volume_derived_props.transmission_tint, resolved_inputs.geometry_thin_walled, thin_wall_aware_cos_theta, relative_ior_for_refraction);
@@ -933,13 +946,10 @@ OpenPBR_PreparedBsdf openpbr_prepare_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_C
     return prepared;
 }
 
-// Importance-samples a light direction and returns weight, PDF, and sampled lobe type.
+// Evaluates the BSDF for the given light direction, summed over all lobes.
 //
-// The returned weight includes the cosine term; specifically it is the BSDF value
-// multiplied by cos(theta) and divided by the PDF (with respect to solid angle).
-// It takes all lobes and all sampling techniques into account (effectively doing MIS internally).
-//
-// BSDF values returned include cosine term.
+// The returned value includes the cosine term: it is the BSDF value multiplied by cos(theta)
+// (with respect to solid angle). Unlike a sampled weight, it is not divided by a PDF.
 OpenPBR_DiffuseSpecular openpbr_eval_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_PreparedBsdf) prepared, const vec3 light_direction)
 {
     return OPENPBR_GET_SPECIALIZATION_CONSTANT(EnableSheenAndCoat)
@@ -1002,7 +1012,7 @@ float openpbr_pdf_impl(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_Pr
 //   probability  - material's straight-through probability (before caller scaling);
 //                  0 for fully opaque materials (early-out; weight is undefined)
 //
-// cos_theta = dot(surface_normal, shadow_ray_direction); positive = front side.
+// cos_theta = dot(surface_normal, view_direction); positive = front side.
 //
 // Preconditions:
 //   - openpbr_prepare_volume() must have been called to populate volume_derived_props.

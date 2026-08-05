@@ -63,6 +63,15 @@
 using vec2 = float2;
 using vec3 = float3;
 using vec4 = float4;
+
+// GLSL-style component-wise comparison functions. MSL provides the underlying
+// relational operators but not these GLSL names; each returns a component-wise bool
+// vector. Defined as functions (not macros) so they never clobber host identifiers,
+// mirroring the C++ interop layer.
+template <typename T, int N> vec<bool, N> equal(const vec<T, N> a, const vec<T, N> b) { return a == b; }
+template <typename T, int N> vec<bool, N> notEqual(const vec<T, N> a, const vec<T, N> b) { return a != b; }
+template <typename T, int N> vec<bool, N> greaterThan(const vec<T, N> a, const vec<T, N> b) { return a > b; }
+template <typename T, int N> vec<bool, N> greaterThanEqual(const vec<T, N> a, const vec<T, N> b) { return a >= b; }
 #endif  // !OPENPBR_USE_CUSTOM_VEC_TYPES
 
 // Fixed-width integer type aliases. uint and ushort are built-in MSL types.
