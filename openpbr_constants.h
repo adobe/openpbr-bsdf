@@ -30,6 +30,6 @@ OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_RcpFourPi = 0.0795774715f;  // 1 / (4 * P
 
 OPENPBR_CONSTEXPR_GLOBAL int OpenPBR_NumRgbChannels = 3;
 OPENPBR_CONSTEXPR_GLOBAL float OpenPBR_VacuumIor = 1.0f;
-OPENPBR_CONSTEXPR_GLOBAL vec3 OpenPBR_BaseRgbWavelengths_nm = vec3(620.0f, 540.0f, 450.0f);
+OPENPBR_MAYBE_CONSTEXPR_GLOBAL vec3 OpenPBR_BaseRgbWavelengths_nm = vec3(620.0f, 540.0f, 450.0f);
 
 #endif

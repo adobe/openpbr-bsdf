@@ -42,8 +42,12 @@
 
 // Constexpr function qualifiers.
 // GLSL has no constexpr function concept, so these are empty.
-#define OPENPBR_GENERAL_CONSTEXPR_FUNCTION
-#define OPENPBR_LIMITED_CONSTEXPR_FUNCTION
+#define OPENPBR_CONSTEXPR_FUNCTION
+#define OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+
+// Vector-typed constant qualifiers. GLSL uses const for both local and global constants.
+#define OPENPBR_MAYBE_CONSTEXPR_LOCAL const
+#define OPENPBR_MAYBE_CONSTEXPR_GLOBAL const
 
 // Function inline specifier.
 // GLSL does not require an explicit inline keyword.

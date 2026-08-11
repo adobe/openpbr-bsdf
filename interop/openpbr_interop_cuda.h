@@ -52,8 +52,20 @@
 
 // Constexpr function qualifiers.
 // CUDA supports constexpr functions directly.
-#define OPENPBR_GENERAL_CONSTEXPR_FUNCTION static constexpr
-#define OPENPBR_LIMITED_CONSTEXPR_FUNCTION static constexpr
+#define OPENPBR_CONSTEXPR_FUNCTION static constexpr
+
+// Vector-typed qualifiers. CUDA float2/float3/float4 are constexpr-constructible like C++, so these
+// match the scalar qualifiers. #ifndef-guarded so an OPENPBR_USE_CUSTOM_VEC_TYPES host whose vector
+// types have different constexpr capability can predefine them.
+#ifndef OPENPBR_MAYBE_CONSTEXPR_LOCAL
+#define OPENPBR_MAYBE_CONSTEXPR_LOCAL constexpr
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_GLOBAL
+#define OPENPBR_MAYBE_CONSTEXPR_GLOBAL static inline constexpr
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+#define OPENPBR_MAYBE_CONSTEXPR_FUNCTION static constexpr
+#endif
 
 // Function inline specifier.
 // CUDA GPU-callable helpers use __device__ inline.

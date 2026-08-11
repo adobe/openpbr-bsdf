@@ -224,10 +224,12 @@ vec3 openpbr_disney_sheen_fetch_coeffs(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONS
     // we compensate the difference between bilinear interpolation in that table and in a regular texture by:
     //     - keeping the original sampling indices.
     //     - offsetting the UVs by 0.5 (in pixel space).
-    OPENPBR_CONSTEXPR_LOCAL vec2 uv_max =
-        vec2(float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize), float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize));
-    OPENPBR_CONSTEXPR_LOCAL vec2 uv_step = vec2(0.5f / float(OpenPBR_LTCTableSize), 0.5f / float(OpenPBR_LTCTableSize));
-    const vec2 uv = vec2(openpbr_get_cos_theta_local(direction_local), lobe.alpha) * uv_max + uv_step;
+    // Scalar scale/offset (identical for both components); kept scalar so they stay compile-time
+    // constants on every backend regardless of vector-type constexpr support.
+    OPENPBR_CONSTEXPR_LOCAL float UVScale = float(OpenPBR_LTCTableSize - 1) / float(OpenPBR_LTCTableSize);
+    OPENPBR_CONSTEXPR_LOCAL float UVOffset = 0.5f / float(OpenPBR_LTCTableSize);
+    const float uv_cos_theta = openpbr_get_cos_theta_local(direction_local);
+    const vec2 uv = vec2(uv_cos_theta * UVScale + UVOffset, lobe.alpha * UVScale + UVOffset);
     return OPENPBR_SWIZZLE(OPENPBR_SAMPLE_2D_TEXTURE(OpenPBR_LutId_LTC, uv), xyz);
 #else
     // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
@@ -398,7 +400,7 @@ float openpbr_sheen_probability(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(O
 
     // TODO: Take the real path throughput into account (for both standalone lobes),
     //       either by saving it in the lobe struct or by passing it in.
-    OPENPBR_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
+    OPENPBR_MAYBE_CONSTEXPR_LOCAL vec3 PlaceholderPathThroughput = vec3(1.0f);
 
     // lobe.view_reflected is already weighted by lobe.presence; see openpbr_proportion_reflected().
     const float sheen_contribution = lobe.view_reflected * openpbr_max3(lobe.tint);

@@ -39,8 +39,19 @@
 
 // Constexpr function qualifiers.
 // Slang uses HLSL-style syntax and does not have a constexpr concept for functions.
-#define OPENPBR_GENERAL_CONSTEXPR_FUNCTION
-#define OPENPBR_LIMITED_CONSTEXPR_FUNCTION
+#define OPENPBR_CONSTEXPR_FUNCTION
+
+// Vector-typed qualifiers. Slang uses const (local) / static const (global); no constexpr concept.
+// #ifndef-guarded so an OPENPBR_USE_CUSTOM_VEC_TYPES host whose vector types differ can predefine them.
+#ifndef OPENPBR_MAYBE_CONSTEXPR_LOCAL
+#define OPENPBR_MAYBE_CONSTEXPR_LOCAL const
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_GLOBAL
+#define OPENPBR_MAYBE_CONSTEXPR_GLOBAL static const
+#endif
+#ifndef OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+#define OPENPBR_MAYBE_CONSTEXPR_FUNCTION
+#endif
 
 // Function inline specifier.
 // Slang does not require an explicit inline keyword.

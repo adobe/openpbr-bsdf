@@ -44,40 +44,40 @@ OPENPBR_INLINE_FUNCTION vec2  openpbr_fast_normalize(const vec2 v) { return OPEN
 OPENPBR_INLINE_FUNCTION vec3  openpbr_fast_normalize(const vec3 v) { return OPENPBR_FAST_NORMALIZE(v); }
 // clang-format on
 
-OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_square(const float x)
+OPENPBR_CONSTEXPR_FUNCTION float openpbr_square(const float x)
 {
     return x * x;
 }
 
-OPENPBR_LIMITED_CONSTEXPR_FUNCTION vec3 openpbr_square(const vec3 v)
+OPENPBR_MAYBE_CONSTEXPR_FUNCTION vec3 openpbr_square(const vec3 v)
 {
     return vec3(v.x * v.x, v.y * v.y, v.z * v.z);
 }
 
-OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_fourth_power(const float x)
+OPENPBR_CONSTEXPR_FUNCTION float openpbr_fourth_power(const float x)
 {
     const float xx = x * x;
     return xx * xx;
 }
 
-OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_fifth_power(const float x)
+OPENPBR_CONSTEXPR_FUNCTION float openpbr_fifth_power(const float x)
 {
     const float xx = x * x;
     return xx * xx * x;
 }
 
-OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_sixth_power(const float x)
+OPENPBR_CONSTEXPR_FUNCTION float openpbr_sixth_power(const float x)
 {
     const float xx = x * x;
     return xx * xx * xx;
 }
 
-OPENPBR_LIMITED_CONSTEXPR_FUNCTION float openpbr_min3(const vec3 v)
+OPENPBR_MAYBE_CONSTEXPR_FUNCTION float openpbr_min3(const vec3 v)
 {
     return min(min(v.x, v.y), v.z);
 }
 
-OPENPBR_LIMITED_CONSTEXPR_FUNCTION float openpbr_max3(const vec3 v)
+OPENPBR_MAYBE_CONSTEXPR_FUNCTION float openpbr_max3(const vec3 v)
 {
     return max(max(v.x, v.y), v.z);
 }

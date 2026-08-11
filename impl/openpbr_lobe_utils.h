@@ -149,7 +149,7 @@ float openpbr_max_component_of_throughput_weighted_color(const vec3 path_through
 }
 
 // Converts IOR to F0.
-OPENPBR_GENERAL_CONSTEXPR_FUNCTION float openpbr_f0_from_ior(const float eta_t_over_eta_i)
+OPENPBR_CONSTEXPR_FUNCTION float openpbr_f0_from_ior(const float eta_t_over_eta_i)
 {
     return openpbr_square((eta_t_over_eta_i - 1.0f) / (eta_t_over_eta_i + 1.0f));
 }
