@@ -98,16 +98,17 @@ vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, 
     // But (1.0 - z * z) is numerically unstable when z is near +/-1.0 (i.e. near the cap poles).
     // Using the identity (1 - z * z) == (1 + z) * (1 - z) gives a more stable result.
     const float one_plus_cos = 1.0f + cos_incoming;
-    const float cos_incoming_plus_z = (1.0f - rand.y) * one_plus_cos;
-    const float one_plus_z = cos_incoming_plus_z + (1.0f - cos_incoming);
+    const float halfway_z = (1.0f - rand.y) * one_plus_cos;
     const float one_minus_z = rand.y * one_plus_cos;
+    const float one_minus_cos = 1.0f - cos_incoming;
+    const float one_plus_z = halfway_z + one_minus_cos;
     const float tangent_plane_component = openpbr_fast_sqrt(one_plus_z * one_minus_z);
 
     // Compute halfway direction.
     const vec3 microfacet_normal_hemisphere = vec3(
         tangent_plane_component * cos(angle) + incoming_hemisphere.x,
         tangent_plane_component * sin(angle) + incoming_hemisphere.y,
-        cos_incoming_plus_z);
+        halfway_z);
 
     // The inverse transformation for the sampled normal is the same
     // as the forward transformation for the incoming direction.
@@ -139,7 +140,7 @@ float openpbr_eval_aniso_smith_g2(const vec3 v1, const vec3 v2, const vec2 alpha
 }
 
 // Weights a color by the path throughput and then returns the max component of the product.
-// Used for estimating the average contribution of a BSDF lobe, which is used for lobe selection.
+// Used for estimating the overall contribution of a BSDF lobe, which is used for lobe selection.
 float openpbr_max_component_of_throughput_weighted_color(const vec3 path_throughput, const vec3 x)
 {
     OPENPBR_ASSERT(all(greaterThanEqual(path_throughput, vec3(0.0f))), "Throughput is expected to be non-negative");
@@ -173,18 +174,6 @@ float openpbr_apply_specular_weight_to_ior(const float eta_t_over_eta_i, const f
     const float external_ior = openpbr_ior_from_f0(clamped_scaled_f0);
     const bool internal_reflection = eta_t_over_eta_i < 1.0f;
     return internal_reflection ? 1.0f / external_ior : external_ior;
-}
-
-// Calculates Schlick Fresnel reflectivity given color F0.
-vec3 openpbr_schlick(const float cos_theta, const vec3 f0)
-{
-    return f0 + (vec3(1.0f) - f0) * openpbr_fifth_power(1.0f - abs(cos_theta));
-}
-
-// Calculates Schlick Fresnel reflectivity given scalar F0.
-float openpbr_schlick(const float cos_theta, const float f0)
-{
-    return f0 + (1.0f - f0) * openpbr_fifth_power(1.0f - min(abs(cos_theta), 1.0f));
 }
 
 // Calculates real unpolarized Fresnel reflectivity.

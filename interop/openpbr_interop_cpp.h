@@ -85,7 +85,6 @@ using glm::vec4;
 // Math functions
 using glm::abs;
 using glm::acos;
-using glm::atan;
 using glm::clamp;
 using glm::cos;
 using glm::exp;
@@ -120,8 +119,8 @@ using glm::any;
 
 // Fixed-width integer type aliases matching shader-language conventions.
 // C++ has no "uint" keyword; std::uint32_t / std::uint16_t from <cstdint> are exact.
-// Unlike cassert, cstdint is safe to include at class scope (it emits only typedefs,
-// not extern "C" linkage specifications), so no #ifndef guard is needed here.
+// <cstdint> declares names in namespace std, so it must be included at file scope (not class
+// scope); it self-guards against repeated inclusion, so no extra #ifndef wrapper is needed here.
 #include <cstdint>
 #ifndef OPENPBR_UINT32
 #define OPENPBR_UINT32 std::uint32_t

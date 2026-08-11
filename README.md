@@ -1,6 +1,6 @@
 # Adobe's OpenPBR BSDF
 
-A self-contained, portable implementation of the [OpenPBR 1.1](https://academysoftwarefoundation.github.io/OpenPBR/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
+A self-contained, portable implementation of the [OpenPBR 1.1.1](https://academysoftwarefoundation.github.io/OpenPBR/) BSDF, extracted from Adobe's proprietary renderer, Eclair. Written in a GLSL-style language with macros that target C++, GLSL, CUDA, MSL (Metal Shading Language), or Slang, it's designed to drop into any path tracer with minimal setup.
 
 ---
 
@@ -18,7 +18,7 @@ In addition to those three core functions, the prepared BSDF exposes two additio
 
 ## Why Open Source?
 
-OpenPBR is a powerful but complex material model — implementing it well from scratch requires deep rendering knowledge and a lot of time. We're open-sourcing this to lower that barrier: even a simple path tracer can integrate this production-grade implementation of the full OpenPBR 1.1 parameter set. This is the same code that ships in Eclair today, not a prototype or sample, and we hope it helps teams across the ecosystem adopt OpenPBR faster and validate their own integrations against a real-world reference. The code is released under Apache 2.0.
+OpenPBR is a powerful but complex material model — implementing it well from scratch requires deep rendering knowledge and a lot of time. We're open-sourcing this to lower that barrier: even a simple path tracer can integrate this production-grade implementation of the full OpenPBR 1.1.1 parameter set. This is the same code that ships in Eclair today, not a prototype or sample, and we hope it helps teams across the ecosystem adopt OpenPBR faster and validate their own integrations against a real-world reference. The code is released under Apache 2.0.
 
 Note: This is shared as a reference implementation, not run as a community-driven open-source project. Because this code lives in a shipping product, we can't commit to a formal external review process. Pull requests, bug reports, and feature requests are all welcome, and we'll address them on a best-effort basis as our priorities allow. We can't promise to address every item, and large or invasive changes are unlikely to be accepted.
 
@@ -29,7 +29,7 @@ Note: This is shared as a reference implementation, not run as a community-drive
 - **Single-include API:** `#include "openpbr.h"` brings in the complete public API — all types, settings, and the full BSDF.
 - **Multi-language support:** C++, GLSL, CUDA, MSL, or Slang from the same source via a thin interop layer.
 - **Self-contained:** No globals, no hidden dependencies — everything lives alongside the BSDF.
-- **Configurable:** Compile-time settings in `openpbr_settings.h` control LUT mode, coat/fuzz attenuation, fast math overrides, conflict-suppression hooks, specialization constants, and custom interop.
+- **Configurable:** Compile-time settings in `openpbr_settings.h` — LUT storage mode, language target, specialization constants, custom overrides, and more.
 - **Fixed-lobe architecture:** One struct per material component.
 - **Energy-conserving:** The BSDF is designed to be energy-conserving for most common configurations, using precomputed LUTs for multiple-scattering compensation.
 - **Reciprocal:** The BSDF is reciprocal for most configurations. See [Path Tracing Direction](#path-tracing-direction) for the transmission, coat, and fuzz exceptions.
@@ -51,7 +51,7 @@ openpbr/
 ├── openpbr_basis.h               ← Coordinate frame utilities
 ├── openpbr_diffuse_specular.h    ← Diffuse/specular component type
 ├── openpbr_bsdf_lobe_type.h      ← BSDF lobe type flags
-├── openpbr_homogeneous_volume.h  ← Volume type (OpenPBR_HomogeneousVolume) and volume integration helpers (distance sampling, transmittance, phase functions)
+├── openpbr_homogeneous_volume.h  ← Volume type and integration helpers (distance sampling, transmittance, phase functions)
 ├── openpbr_api.h                 ← Public BSDF functions (prepare, eval, sample, pdf)
 └── impl/                         ← All implementation details (lobes, utilities, data)
     ├── openpbr_bsdf.h                     ← Main BSDF implementation
@@ -67,7 +67,7 @@ openpbr/
 ```
 
 1. **Resolved Inputs**
-   - `OpenPBR_ResolvedInputs` — A struct containing the full OpenPBR 1.1 parameter set after texture evaluation (`base_color`, `specular_roughness`, etc.), plus two required non-spec additions (`geometry_basis` and `geometry_coat_basis`, which replace the spec's `geometry_normal`/`geometry_tangent`/`geometry_coat_normal`/`geometry_coat_tangent` raw vectors) and two optional extensions (`specular_anisotropy_rotation_cos_sin` and `coat_anisotropy_rotation_cos_sin`). See [Departures from the OpenPBR Specification](#departures-from-the-openpbr-specification) for details.
+   - `OpenPBR_ResolvedInputs` — A struct containing the full OpenPBR 1.1.1 parameter set after texture evaluation (`base_color`, `specular_roughness`, etc.), plus two required non-spec additions (`geometry_basis` and `geometry_coat_basis`, which replace the spec's `geometry_normal`/`geometry_tangent`/`geometry_coat_normal`/`geometry_coat_tangent` raw vectors) and two optional extensions (`specular_anisotropy_rotation_cos_sin` and `coat_anisotropy_rotation_cos_sin`). See [Departures from the OpenPBR Specification](#departures-from-the-openpbr-specification) for details.
    - `openpbr_make_default_resolved_inputs()` — Creates an `OpenPBR_ResolvedInputs` with default parameter values from the OpenPBR specification.
 
 2. **Initialization**
@@ -296,11 +296,11 @@ To check whether a material activates these effects before deciding how to sampl
 
 ## Departures from the OpenPBR Specification
 
-`OpenPBR_ResolvedInputs` implements the full [OpenPBR 1.1 parameter set](https://academysoftwarefoundation.github.io/OpenPBR/) with two intentional departures described below.
+`OpenPBR_ResolvedInputs` implements the full [OpenPBR 1.1.1 parameter set](https://academysoftwarefoundation.github.io/OpenPBR/) with two intentional departures described below.
 
 ### 1. Geometry parameters replaced by pre-orthonormalized basis structs
 
-The OpenPBR 1.1 specification defines four geometry input parameters:
+The OpenPBR 1.1.1 specification defines four geometry input parameters:
 
 | Spec parameter          | Type      | Description               |
 |-------------------------|-----------|---------------------------|
@@ -322,14 +322,14 @@ This representation is used because the BSDF performs numerous dot products, cro
 
 ### 2. Anisotropy rotation: (cos θ, sin θ) extension (not in OpenPBR spec)
 
-OpenPBR 1.1 defines `specular_roughness_anisotropy` and `coat_roughness_anisotropy` (anisotropy magnitude in `[0, 1]`), but provides no rotation angle parameter. This implementation adds two optional extension fields:
+OpenPBR 1.1.1 defines `specular_roughness_anisotropy` and `coat_roughness_anisotropy` (anisotropy magnitude in `[0, 1]`), but provides no rotation angle parameter. This implementation adds two optional extension fields:
 
 | Extension field                        | Type   | Default  | Description                                        |
 |----------------------------------------|--------|----------|----------------------------------------------------|
 | `specular_anisotropy_rotation_cos_sin` | `vec2` | `(1, 0)` | (cos θ, sin θ) of the specular anisotropy rotation |
 | `coat_anisotropy_rotation_cos_sin`     | `vec2` | `(1, 0)` | (cos θ, sin θ) of the coat anisotropy rotation     |
 
-Both default to `(1, 0)` = (cos 0°, sin 0°), which is a no-op equivalent to having no rotation at all. The vec2 does not need to be unit-length (as can happen after texture filtering); the BSDF normalizes it internally and treats `(0, 0)` as no rotation.
+Both default to `(1, 0)` = (cos 0°, sin 0°), which is a no-op (no rotation). The vec2 does not need to be unit-length (as can happen after texture filtering); the BSDF normalizes it internally and treats `(0, 0)` as no rotation.
 
 This representation is used for two main reasons:
 
@@ -358,10 +358,10 @@ The CUDA interop header aliases `vec2`/`vec3`/`vec4` to CUDA's `float2`/`float3`
 
 We welcome issues and pull requests, for example:
 
-- A small material-preview program that renders a sphere lit by a simple analytic environment and writes out an image, to visualize a given material configuration (kept separate from the minimal demo, which stays focused on illustrating the API)
 - Expanded unit tests for evaluation, sampling, and energy conservation — for example, a minimal white-furnace test over a range of material configurations
 - Testing of the CUDA backend, which hasn't yet been used in production code
 - Testing of the Slang backend in HLSL-style pipelines (and, if needed, adapting the Slang interop aliases or proposing a dedicated HLSL interop header)
+- A small material-preview program that renders a sphere lit by a simple analytic environment and writes out an image, to visualize a given material configuration (kept separate from the minimal demo, which stays focused on illustrating the API)
 
 Planned or potential future work:
 

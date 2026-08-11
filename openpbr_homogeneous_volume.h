@@ -227,8 +227,9 @@ OPENPBR_INLINE_FUNCTION vec3 openpbr_calculate_color_channel_probability(OPENPBR
 // contributions. The result is that the weights and the average path throughput remain stable even
 // when the volume has highly chromatic extinction and high albedo.
 //
-// This function sets the distance argument if light interacted with the volume. If there is no
-// volume, the distance argument is left as is.
+// This function sets the distance argument if light interacted with the volume. It must only be
+// called for a non-empty (valid homogeneous) volume; callers should skip empty volumes (see the
+// assert below), which also saves a random number.
 OPENPBR_INLINE_FUNCTION void openpbr_sample_event_distance(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_HomogeneousVolume) volume,
                                                            const vec3 throughput,
                                                            const float rand,

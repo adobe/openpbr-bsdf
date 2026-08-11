@@ -28,8 +28,9 @@
 OPENPBR_INLINE_FUNCTION vec3 openpbr_sample_unit_sphere_uniform(const vec2 s)
 {
     const float phi = OpenPBR_TwoPi * s[0];
-    const float z = 2.0f * s[1] - 1.0f;              // cos(theta)
-    const float r = sqrt(1.0f - openpbr_square(z));  // sin(theta)
+    const float z = 2.0f * s[1] - 1.0f;  // cos(theta)
+    // Evaluate sin(theta) from the original sample so rounding z cannot collapse near-pole samples.
+    const float r = 2.0f * sqrt(s[1] * (1.0f - s[1]));
     return vec3(cos(phi) * r, sin(phi) * r, z);
 }
 

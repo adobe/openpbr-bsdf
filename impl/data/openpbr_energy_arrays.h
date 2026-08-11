@@ -33,14 +33,14 @@
 //
 // OPENPBR_ENERGY_TABLES_USE_UINT16 is set by each per-language interop file:
 //   - 1 uses OPENPBR_UINT16 (16-bit)
-//   - 0 uses OPENPBR_UINT   (32-bit)
+//   - 0 uses OPENPBR_UINT32 (32-bit)
 //
-// OPENPBR_UINT and OPENPBR_UINT16 are defined by the active interop backend.
+// OPENPBR_UINT32 and OPENPBR_UINT16 are defined by the active interop backend.
 // Examples:
-//   - C++/CUDA: OPENPBR_UINT = std::uint32_t, OPENPBR_UINT16 = std::uint16_t
-//   - MSL:      OPENPBR_UINT = uint,          OPENPBR_UINT16 = ushort
-//   - Slang:    OPENPBR_UINT = uint,          OPENPBR_UINT16 = unsigned short
-//   - GLSL:     OPENPBR_UINT = uint (OPENPBR_ENERGY_TABLES_USE_UINT16 is 0)
+//   - C++/CUDA: OPENPBR_UINT32 = std::uint32_t, OPENPBR_UINT16 = std::uint16_t
+//   - MSL:      OPENPBR_UINT32 = uint,          OPENPBR_UINT16 = ushort
+//   - Slang:    OPENPBR_UINT32 = uint,          OPENPBR_UINT16 = unsigned short
+//   - GLSL:     OPENPBR_UINT32 = uint (OPENPBR_ENERGY_TABLES_USE_UINT16 is 0)
 #ifndef OPENPBR_ENERGY_TABLES_USE_UINT16
 #error "OPENPBR_ENERGY_TABLES_USE_UINT16 is not defined. An OpenPBR interop header must be included before this file (normally via openpbr.h)."
 #endif

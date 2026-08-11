@@ -292,7 +292,8 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
                 }
                 else  // delta
                 {
-                    weight = openpbr_scale_diffuse_specular(weight, inverse_coat_reflection_prob);
+                    // Include presence to match the coat term in the eval path (openpbr_combine_coat_and_base_evals).
+                    weight = openpbr_scale_diffuse_specular(weight, lobe.presence * inverse_coat_reflection_prob);
                 }
             }
         }

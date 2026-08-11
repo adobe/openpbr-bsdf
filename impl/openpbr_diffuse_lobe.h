@@ -48,8 +48,14 @@ float openpbr_E_FON_exact(const float mu, const float roughness)
 {
     const float AF = 1.0f / (1.0f + OpenPBR_FONConstantA * roughness);  // FON A coeff.
     const float BF = roughness * AF;                                    // FON B coeff.
-    const float Si = sqrt(1.0f - (mu * mu));
-    const float G = Si * (acos(clamp(mu, -1.0f, 1.0f)) - Si * mu) + (2.0f / 3.0f) * ((Si / mu) * (1.0f - (Si * Si * Si)) - Si);
+    // Clamp an approximately normalized cosine to its physical domain.
+    const float clamped_mu = clamp(mu, 0.0f, 1.0f);
+    const float Si = sqrt(1.0f - openpbr_square(clamped_mu));
+    // The reference implementation accompanying Portsmouth, Kutz, and Hill's EON paper uses
+    // (Si / mu) * (1 - Si^3). The identity 1 - Si^3 = mu^2 * (1 + Si + Si^2) / (1 + Si)
+    // gives the equivalent form below, which is finite at mu = 0 and cancellation-free near Si = 1.
+    const float G = Si * (acos(clamped_mu) - Si * clamped_mu) +
+                    (2.0f / 3.0f) * (Si * clamped_mu * (1.0f + Si + Si * Si) / (1.0f + Si) - Si);
     return AF + (BF * OpenPBR_RcpPi) * G;
 }
 
@@ -95,17 +101,12 @@ vec3 openpbr_f_EON(const vec3 rho, const float roughness, const vec3 wi_local, c
 // Top-level wrapper function.
 // ---------------------------
 
-// This function calculates the diffuse BRDF value adjusted for the specular energy compensation.
-// It handles selection of the appropriate BRDF model and conversion of the view and light directions to local space.
-vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
-                                                      const vec3 view_direction,
-                                                      const vec3 light_direction)
+// Evaluates the diffuse BRDF for directions already expressed in the lobe.normal_ff local frame.
+vec3 openpbr_diffuse_brdf_value_adjusted_for_specular_local(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe)
+                                                                lobe,
+                                                            const vec3 wi_local,
+                                                            const vec3 wo_local)
 {
-    // Calculate a local basis:
-    const OpenPBR_Basis basis = openpbr_make_basis(lobe.normal_ff);
-    const vec3 wi_local = openpbr_world_to_local(basis, view_direction);
-    const vec3 wo_local = openpbr_world_to_local(basis, light_direction);
-
     OPENPBR_CONSTEXPR_LOCAL bool Exact = false;
     const vec3 brdf_value = openpbr_f_EON(lobe.diffuse_albedo, lobe.diffuse_roughness, wi_local, wo_local, Exact);
 
@@ -116,6 +117,18 @@ vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(OPENPBR_ADDRESS_SPACE_THRE
         openpbr_look_up_opaque_dielectric_energy_complement(lobe.specular_eta_t_over_eta_i, lobe.specular_alpha, cos_out);
 
     return brdf_value * specular_energy_compensation;
+}
+
+vec3 openpbr_diffuse_brdf_value_adjusted_for_specular(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_EnergyConservingRoughDiffuseLobe) lobe,
+                                                      const vec3 view_direction,
+                                                      const vec3 light_direction)
+{
+    // Calculate a local basis:
+    const OpenPBR_Basis basis = openpbr_make_basis(lobe.normal_ff);
+    const vec3 wi_local = openpbr_world_to_local(basis, view_direction);
+    const vec3 wo_local = openpbr_world_to_local(basis, light_direction);
+
+    return openpbr_diffuse_brdf_value_adjusted_for_specular_local(lobe, wi_local, wo_local);
 }
 
 // ------------------------
@@ -194,12 +207,14 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
         return false;
     }
 
-    // Map to world.
-    // TODO: Avoid mapping back and forth.
-    light_direction = openpbr_local_to_world(openpbr_make_basis(lobe.normal_ff), light_direction_local);
+    // Use one basis for both the world-space output and local-space BRDF evaluation.
+    const OpenPBR_Basis basis = openpbr_make_basis(lobe.normal_ff);
+    light_direction = openpbr_local_to_world(basis, light_direction_local);
+    const vec3 view_direction_local = openpbr_world_to_local(basis, view_direction);
 
-    weight = openpbr_make_diffuse_specular_from_diffuse(openpbr_diffuse_brdf_value_adjusted_for_specular(lobe, view_direction, light_direction) *
-                                                        OpenPBR_Pi);  // the pdf is cos_out/pi so the cos_out terms cancels out
+    weight = openpbr_make_diffuse_specular_from_diffuse(
+        openpbr_diffuse_brdf_value_adjusted_for_specular_local(lobe, view_direction_local, light_direction_local) *
+        OpenPBR_Pi);  // pdf = cos_out / pi, so the cosine term cancels
     pdf = cos_out * OpenPBR_RcpPi;
     sampled_type = openpbr_get_lobe_type(lobe);
     return true;
