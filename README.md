@@ -246,6 +246,12 @@ inputs.geometry_basis.n = world_normal;     // interpolated or normal-mapped
 
 As long as `view_direction`, `light_direction`, and the basis vectors are all expressed in the same space, any consistent choice of space will produce correct results.
 
+### Numerical Precision and Fast Math
+
+The BSDF is written to tolerate the reduced precision of the fast-math hooks (see [Getting Started](#getting-started)) and platform-specific floating point, guarding the places where approximate math could otherwise yield an invalid result (for example, random numbers that drift out of range, or samples pushed into the wrong hemisphere).
+
+One implication matters for integrators: the sampled `light_direction` is normalized, but floating-point rounding — and any approximate fast-math hooks you supply — leave it slightly off unit length. Renormalize downstream if you need it exact. (Inputs, by contrast, must be supplied normalized — see [Coordinate Space Requirements](#coordinate-space-requirements).)
+
 ### Distance Units
 
 As per the OpenPBR specification, distances are assumed to be in world-space units. If different units are needed, unit conversions need to happen outside the BSDF code.

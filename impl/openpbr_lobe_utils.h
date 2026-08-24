@@ -84,6 +84,10 @@ float openpbr_eval_aniso_ggx(const vec3 n, const vec2 alpha)
 // Based on the technique described in the paper "Sampling Visible GGX Normals with Spherical Caps" (https://arxiv.org/abs/2306.05044).
 vec3 openpbr_sample_aniso_ggx_smith_vndf(const vec2 alpha, const vec3 incoming, const vec2 rand)
 {
+    // The spherical-cap sampling below requires rand.y in [0, 1); at rand.y == 1 the microfacet
+    // normal collapses to the zero vector, which normalizes to NaN.
+    OPENPBR_ASSERT(rand.y < 1.0f, "rand.y is assumed to be less than 1");
+
     // Transform ellipsoid configuration into sphere configuration.
     const vec3 ellipsoid_to_hemisphere = vec3(alpha.x, alpha.y, 1.0f);
     const vec3 incoming_hemisphere = openpbr_fast_normalize(ellipsoid_to_hemisphere * incoming);

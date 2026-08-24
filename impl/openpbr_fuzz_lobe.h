@@ -203,7 +203,7 @@ vec3 openpbr_disney_sheen_sample_ltc(const vec3 ltc_coeffs, const vec2 rand)
     const float b_inv = ltc_coeffs[1];
     const float a = 1.0f / a_inv;
     const vec3 wi_local = vec3(wi_original_local.x * a - wi_original_local.z * b_inv * a, wi_original_local.y * a, wi_original_local.z);
-    return normalize(wi_local);
+    return openpbr_fast_normalize(wi_local);
 }
 
 // Fetch the LTC coefficients by bilinearly interpolating entries in a 32x32 lookup table.
@@ -493,7 +493,8 @@ bool openpbr_sample_lobe(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CONST_REF(OpenPBR_
             return false;
         }
 
-        light_direction = openpbr_local_to_world(lobe.basis, light_dir_local);
+        // Unit-length by construction, but normalize to control for rounding error in the basis rotation.
+        light_direction = openpbr_fast_normalize(openpbr_local_to_world(lobe.basis, light_dir_local));
 
         pdf = openpbr_disney_sheen_pdf(lobe, lobe.view_dir_local, light_dir_local) * sheen_prob;
         pdf += openpbr_calculate_lobe_pdf(lobe.coating_lobe, view_direction, light_direction) *

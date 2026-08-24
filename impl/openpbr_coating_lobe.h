@@ -343,10 +343,12 @@ float openpbr_estimate_lobe_contribution(OPENPBR_ADDRESS_SPACE_THREAD OPENPBR_CO
     else
     {
         // Here we can use lobe.in_reflected instead of calling estimate_lobe_contribution
-        // because we know the inner details of the coat reflection lobe.
-        const float coat_reflection_lobe_contribution = lobe.in_reflected;
+        // because we know the inner details of the coat reflection lobe. Weight the coat
+        // reflectance and the base-through-coat by the path throughput once each, so the two
+        // stay consistent with each other and with the sibling lobes.
+        const float coat_reflection_lobe_contribution = openpbr_max3(path_throughput) * lobe.in_reflected;
 
-        const float base_lobe_scale = openpbr_max_component_of_throughput_weighted_color(path_throughput, lobe.in_base_layer_scale);
+        const float base_lobe_scale = openpbr_max3(lobe.in_base_layer_scale);
         const float scaled_base_lobe_contribution = unscaled_base_lobe_contribution * base_lobe_scale;
 
         return coat_reflection_lobe_contribution + scaled_base_lobe_contribution;
